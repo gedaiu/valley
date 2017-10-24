@@ -7,5 +7,5 @@ __test__*__
 keys/
 trial-root
 trial_root.d
-valley
+/valley
 valley-test-trial
