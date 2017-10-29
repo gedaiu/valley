@@ -6,110 +6,9 @@ import std.array;
 import std.stdio;
 import std.file;
 import std.conv;
-import std.exception;
-import std.string;
-
-import deimos.openssl.rand;
-import deimos.openssl.bio;
-import deimos.openssl.x509;
-import deimos.openssl.pem;
-import deimos.openssl.rsa;
-import deimos.openssl.err;
-import deimos.openssl.ssl;
+import valley.encryption;
 
 alias OnMessageEvent = void delegate(Message message) nothrow;
-
-shared static this()
-{
-  SSL_load_error_strings();
-  ERR_load_BIO_strings();
-  OpenSSL_add_all_algorithms();
-}
-
-class AES
-{
-  import deimos.openssl.aes;
-  import deimos.openssl.rand;
-
-  private
-  {
-    EVP_CIPHER_CTX ctx;
-  }
-
-  const
-  {
-    ubyte[16] key;
-    ubyte[16] iv;
-  }
-
-  this()
-  {
-    ubyte[16] data;
-    EVP_CIPHER_CTX_init(&ctx);
-    EVP_CipherInit_ex(&ctx, EVP_aes_128_cbc(), null, null, null, 1);
-
-    enforce(EVP_CIPHER_CTX_key_length(&ctx) == data.length);
-    enforce(EVP_CIPHER_CTX_iv_length(&ctx) == data.length);
-
-    auto result = RAND_bytes(data.ptr, data.length);
-    enforce(result == 1, ERR_error_string(ERR_get_error(), null).fromStringz);
-    key = data.dup;
-
-    result = RAND_bytes(data.ptr, data.length);
-    enforce(result == 1, ERR_error_string(ERR_get_error(), null).fromStringz);
-    iv = data.dup;
-  }
-
-  auto encrypt(string data)
-  {
-    EVP_CipherInit_ex(&ctx, null, null, key.dup.ptr, iv.dup.ptr, 1);
-
-    data ~= "\0";
-    ubyte[] encrypted;
-    int encryptedLen = ((data.length / key.length).to!int + 1) * key.length.to!int;
-    int dataLen = data.length.to!int;
-    encrypted.length = encryptedLen;
-
-    const(ubyte)* dataCopy = cast(const(ubyte)*) data.dup.toStringz;
-
-    auto result = EVP_CipherUpdate(&ctx, encrypted.ptr, &encryptedLen, dataCopy, dataLen);
-    enforce(result == 1, ERR_error_string(ERR_get_error(), null).fromStringz);
-
-    result = EVP_CipherFinal_ex(&ctx, encrypted.ptr, &encryptedLen);
-    enforce(result == 1, ERR_error_string(ERR_get_error(), null).fromStringz);
-
-    return encrypted;
-  }
-
-  string decrypt(ubyte[] data)
-  {
-    EVP_CipherInit_ex(&ctx, null, null, key.dup.ptr, null, 0);
-
-    ubyte[] decrypted;
-    decrypted.length = data.length;
-
-    int decryptedLen = data.length.to!int;
-    int dataLen = data.length.to!int;
-
-    auto result = EVP_CipherUpdate(&ctx, decrypted.ptr, &decryptedLen, data.ptr, dataLen);
-    enforce(result == 1, ERR_error_string(ERR_get_error(), null).fromStringz);
-
-    result = EVP_CipherFinal_ex(&ctx, decrypted.ptr, &decryptedLen);
-    enforce(result == 1, ERR_error_string(ERR_get_error(), null).fromStringz);
-
-    return (cast(char*) decrypted.ptr).fromStringz.to!string;
-  }
-}
-
-/// AES should encrypt a text
-unittest
-{
-  auto aes = new AES();
-
-  auto result = aes.encrypt("some text");
-
-  aes.decrypt(result).should.equal("some text");
-}
 
 struct Message
 {
@@ -127,111 +26,11 @@ struct Packet
   string signature;
 }
 
-extern (C)
-{
-  X509* PEM_read_bio_X509(BIO* bp, X509** x, pem_password_cb* callback, void* u);
-}
-
-class Certificate
-{
-  private
-  {
-    rsa_st* rsaPubKey;
-    BIO* bio;
-    X509* certificate;
-  }
-
-  this(string fileName)
-  {
-    string certificateString = readText(fileName);
-
-    EVP_PKEY* pubkey;
-    bio = BIO_new(BIO_s_mem());
-
-    auto lTemp = BIO_write(bio, cast(const(void)*) certificateString.ptr,
-        certificateString.length.to!int);
-    enforce(lTemp == certificateString.length);
-
-    certificate = PEM_read_bio_X509(bio, null, null, null);
-    pubkey = X509_get_pubkey(certificate);
-    scope (exit)
-      EVP_PKEY_free(pubkey);
-
-    rsaPubKey = EVP_PKEY_get1_RSA(pubkey);
-  }
-
-  ~this()
-  {
-    X509_free(certificate);
-    BIO_vfree(bio);
-    RSA_free(rsaPubKey);
-  }
-
-  ubyte[] encrypt(string message)
-  {
-    auto aes = new AES();
-    ubyte[] encryptedData;
-
-    encryptedData.length = RSA_size(rsaPubKey);
-    auto temp = RSA_public_encrypt(message.length.to!int, (cast(ubyte[]) message)
-        .ptr, encryptedData.ptr, rsaPubKey, RSA_PKCS1_OAEP_PADDING);
-
-    return encryptedData;
-  }
-}
-
 Packet toPacket(Message message, string sourceId)
 {
   auto certificate = new Certificate("keys/server.crt");
 
   return Packet(sourceId, message.destinationId, certificate.encrypt(message.data));
-}
-
-class PrivateKey
-{
-
-  private
-  {
-    RSA* rsa_privkey;
-    BIO* bio;
-  }
-
-  this(string fileName)
-  {
-    string certificateString = readText("keys/server.key");
-
-    bio = BIO_new(BIO_s_mem());
-
-    auto lTemp = BIO_write(bio, cast(const(void)*) certificateString.ptr,
-        certificateString.length.to!int);
-    enforce(lTemp == certificateString.length, ERR_error_string(ERR_get_error(), null).fromStringz);
-
-    rsa_privkey = PEM_read_bio_RSAPrivateKey(bio, &rsa_privkey, null, null);
-  }
-
-  ~this()
-  {
-    BIO_vfree(bio);
-    RSA_free(rsa_privkey);
-  }
-
-  string decrypt(ubyte[] data)
-  {
-    ubyte[] decrypted;
-    decrypted.length = RSA_size(rsa_privkey);
-
-    auto result = RSA_private_decrypt(data.length.to!int, data.ptr,
-        decrypted.ptr, rsa_privkey, RSA_PKCS1_OAEP_PADDING);
-    enforce(result != -1, ERR_error_string(ERR_get_error(), null).fromStringz);
-
-    auto pos = decrypted.countUntil(0);
-    if (pos != -1)
-    {
-      decrypted = decrypted[0 .. pos];
-    }
-
-    return decrypted.assumeUTF;
-  }
 }
 
 /// It should convert a Message to a Packet
@@ -276,8 +75,6 @@ unittest
   {
     data ~= uniform(0, 9, rnd).to!string;
   }
-
-  data.writeln;
 
   auto packet = Message("destinationId", data).toPacket("sourceId");
   auto message = packet.decrypt();
