@@ -257,10 +257,12 @@ class PrivateKey
     enforce(success != -1, ERR_error_string(ERR_get_error(), null).fromStringz);
 
     auto rsa = new AES(decrypted[0 .. 16], decrypted[16 .. 32]);
-    auto extra = decrypted[32];
+    size_t extra = decrypted[32];
 
-    auto result = rsa.decrypt(data[keySize .. $]);
+    string result = rsa.decrypt(data[keySize .. $]);
 
-    return result[0 .. $ - extra];
+    string resultCopy = result[0 .. $ - extra];
+
+    return resultCopy;
   }
 }

@@ -6,13 +6,13 @@
 
 	"dependencies": {
 		"vibe-d:stream": "~>0.8.1",
-		"vibe-d:tls": "~>0.8.1"
+		"vibe-d:tls": "~>0.8.1",
+		"htmld": "~>0.2.16"
 	},
 
 	"configurations": [ {
 		"name": "trial",
 		"dependencies": {
-			"arsd-official:terminal": "~>1.2.2",
 			"fluent-asserts": "~>0.7.0"
 		}
 	}],
