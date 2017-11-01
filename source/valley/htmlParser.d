@@ -5,6 +5,7 @@ import std.file;
 import std.conv;
 import std.string;
 import std.algorithm;
+import std.array;
 
 import html.dom;
 
@@ -48,6 +49,18 @@ class HTMLDocument {
     return list;
   }
 
+  string[] links() {
+    string[] list;
+
+    foreach(a; doc.querySelectorAll("a")) {
+      if(a.hasAttr("href")) {
+        list ~= a.attr("href").strip.to!string;
+      }
+    }
+
+    return list.filter!(a => a != "").array;
+  }
+
   auto plainText() {
     auto bodyNode = doc.querySelector("body");
     string[] pieces;
@@ -83,6 +96,7 @@ unittest {
 
   html.title.should.equal("Waiting for 34C3 (@c3daysleft) | Twitter");
   html.preview.should.equal(html.plainText[0..100]);
+  html.links.length.should.be.greaterThan(0);
 }
 
 /// It should get the description from the home dlang page
@@ -92,4 +106,5 @@ unittest {
 
   html.title.should.equal("Home - D Programming Language");
   html.preview.should.equal("D is a general-purpose programming language with static typing, systems-level access, and C-like syntax.");
+  html.links.length.should.be.greaterThan(0);
 }

@@ -7,6 +7,7 @@ import std.stdio;
 import std.file;
 import std.base64;
 import std.bitmanip;
+import std.outbuffer;
 
 import deimos.openssl.rand;
 import deimos.openssl.bio;
@@ -126,7 +127,10 @@ class AES
     auto result = EVP_CipherInit_ex(&ctx, null, null, key.dup.ptr, iv.dup.ptr, 0);
     enforce(result == 1, ERR_error_string(ERR_get_error(), null).fromStringz);
 
-    return (cast(char*) applyCipher(data.dup).ptr).fromStringz.to!string;
+    auto buf = new OutBuffer();
+    buf.write(applyCipher(data.dup));
+
+    return buf.toString();
   }
 }
 
@@ -261,7 +265,8 @@ class PrivateKey
 
     string result = rsa.decrypt(data[keySize .. $]);
 
-    string resultCopy = result[0 .. $ - extra];
+    string resultCopy = result[0 .. $ - extra].dup.to!string;
+    resultCopy.length = result.length - extra;
 
     return resultCopy;
   }
