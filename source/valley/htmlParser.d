@@ -26,8 +26,11 @@ class HTMLDocument {
     Document doc;
   }
 
-  this(string document) {
+  URI uri;
+
+  this(URI uri, string document) {
     doc = createDocument(document);
+    this.uri = uri;
   }
 
   string title() {
@@ -56,7 +59,7 @@ class HTMLDocument {
 
     foreach(a; doc.querySelectorAll("a")) {
       if(a.hasAttr("href")) {
-        list ~= a.attr("href").strip.to!string;
+        list ~= a.attr("href").strip.to!string.toAbsoluteLink(uri.toString);
       }
     }
 
@@ -94,7 +97,7 @@ class HTMLDocument {
 /// It should get the description from a twitter page
 unittest {
   auto rawHtml = readText("testData/page1.html");
-  auto html = new HTMLDocument(rawHtml);
+  auto html = new HTMLDocument(URI("https://twitter.com/c3daysleft?lang=en"), rawHtml);
 
   html.title.should.equal("Waiting for 34C3 (@c3daysleft) | Twitter");
   html.preview.should.equal(html.plainText[0..100]);
@@ -104,15 +107,20 @@ unittest {
 /// It should get the description from the home dlang page
 unittest {
   auto rawHtml = readText("testData/page2.html");
-  auto html = new HTMLDocument(rawHtml);
+  auto html = new HTMLDocument(URI("http://dlang.org"), rawHtml);
 
   html.title.should.equal("Home - D Programming Language");
   html.preview.should.equal("D is a general-purpose programming language with static typing, systems-level access, and C-like syntax.");
 
+  import std.stdio;
+  html.links.writeln;
   html.links.length.should.be.greaterThan(0);
 }
 
 string toAbsoluteLink(string link, string base) {
+  import std.stdio;
+
+  writeln(link, "  ", base);
   auto linkUri = URI(link);
   return (URI(base) ~ linkUri.path ~ linkUri.query).toString;
 }
@@ -123,5 +131,11 @@ unittest {
   "/documentation.html".toAbsoluteLink("http://example.com").should.equal("http://example.com/documentation.html");
 
   "documentation.html".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/pages/documentation.html");
+  "documentation.html".toAbsoluteLink("http://example.com/pages/?some").should.equal("http://example.com/pages/documentation.html");
+
   "/documentation.html".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/documentation.html");
+  "/documentation.html".toAbsoluteLink("http://example.com/pages/?some").should.equal("http://example.com/documentation.html");
+  "/documentation.html?some".toAbsoluteLink("http://example.com/pages").should.equal("http://example.com/documentation.html?some");
+
+  "http://informit.com/articles/article.aspx?p=1609144".toAbsoluteLink("http://dlang.org").should.equal("http://informit.com/articles/article.aspx?p=1609144");
 }
