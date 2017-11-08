@@ -1,5 +1,7 @@
 module valley.htmlParser;
 
+import valley.uri;
+
 import std.stdio;
 import std.file;
 import std.conv;
@@ -106,5 +108,20 @@ unittest {
 
   html.title.should.equal("Home - D Programming Language");
   html.preview.should.equal("D is a general-purpose programming language with static typing, systems-level access, and C-like syntax.");
+
   html.links.length.should.be.greaterThan(0);
+}
+
+string toAbsoluteLink(string link, string base) {
+  auto linkUri = URI(link);
+  return (URI(base) ~ linkUri.path ~ linkUri.query).toString;
+}
+
+/// It should get the absolute link
+unittest {
+  "documentation.html".toAbsoluteLink("http://example.com").should.equal("http://example.com/documentation.html");
+  "/documentation.html".toAbsoluteLink("http://example.com").should.equal("http://example.com/documentation.html");
+
+  "documentation.html".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/pages/documentation.html");
+  "/documentation.html".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/documentation.html");
 }
