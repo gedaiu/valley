@@ -122,7 +122,7 @@ string toAbsoluteLink(string link, string base) {
   auto baseUri = URI(base);
 
   if(linkUri.host != "") {
-    return linkUri.toString;
+    return linkUri.scheme.value != "" ? linkUri.toString : (baseUri.scheme ~ linkUri).toString;
   }
 
   return (baseUri.scheme ~ baseUri.authority ~ baseUri.path ~ linkUri.path ~ linkUri.query).toString;
@@ -141,4 +141,5 @@ unittest {
   "/documentation.html?some".toAbsoluteLink("http://example.com/pages").should.equal("http://example.com/documentation.html?some");
 
   "http://informit.com/articles/article.aspx?p=1609144".toAbsoluteLink("http://dlang.org").should.equal("http://informit.com/articles/article.aspx?p=1609144");
+  "//informit.com/articles/article.aspx?p=1609144".toAbsoluteLink("http://dlang.org").should.equal("http://informit.com/articles/article.aspx?p=1609144");
 }
