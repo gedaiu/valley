@@ -112,17 +112,20 @@ unittest {
   html.title.should.equal("Home - D Programming Language");
   html.preview.should.equal("D is a general-purpose programming language with static typing, systems-level access, and C-like syntax.");
 
-  import std.stdio;
-  html.links.writeln;
   html.links.length.should.be.greaterThan(0);
 }
 
 string toAbsoluteLink(string link, string base) {
   import std.stdio;
 
-  writeln(link, "  ", base);
   auto linkUri = URI(link);
-  return (URI(base) ~ linkUri.path ~ linkUri.query).toString;
+  auto baseUri = URI(base);
+
+  if(linkUri.host != "") {
+    return linkUri.toString;
+  }
+
+  return (baseUri.scheme ~ baseUri.authority ~ baseUri.path ~ linkUri.path ~ linkUri.query).toString;
 }
 
 /// It should get the absolute link
