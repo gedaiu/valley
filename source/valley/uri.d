@@ -147,7 +147,7 @@ struct Path {
   immutable(string) value;
 
   pure inout {
-    bool isAbsolute() {
+    bool isAbsolute() nothrow {
       if(value.length == 0) {
         return false;
       }
@@ -198,13 +198,21 @@ struct Path {
       return value.length;
     }
 
-    Path opBinary(string op)(Path rhs) {
+    Path opBinary(string op)(Path rhs) pure {
       static if (op == "~") {
         if(rhs.isAbsolute) {
           return rhs;
         }
 
         return value.endsWith('/') ? Path(value ~ rhs.toString) : Path(value ~ "/" ~ rhs.toString);
+      } else {
+        static assert(0, "The `" ~ op ~ "` operator is not supported.");
+      }
+    }
+
+    URI opBinary(string op)(Query rhs) pure {
+      static if (op == "~") {
+        return URI(Scheme(""), Authority(""), this, rhs, "");
       } else {
         static assert(0, "The `" ~ op ~ "` operator is not supported.");
       }
@@ -254,7 +262,7 @@ struct URI {
     string fragment;
   }
 
-  this(const Scheme scheme, const Authority authority, const Path path, const Query query, const string fragment) pure {
+  this(const Scheme scheme, const Authority authority, const Path path, const Query query, const string fragment) pure nothrow {
     this.scheme = scheme;
     this.authority = authority;
     this.path = path;
@@ -447,4 +455,11 @@ unittest {
   uri.query.value.should.equal("");
   uri.fragment.should.equal("");
   uri.toString.should.equal("http://example.com");
+}
+
+/// Parse an url that that has no path
+unittest {
+  auto uri = URI("http://example.com/path?query");
+
+  (uri.path ~ uri.query).toString.should.equal("/path?query");
 }

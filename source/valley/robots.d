@@ -2,6 +2,8 @@
 /// https://en.wikipedia.org/wiki/Robots_exclusion_standard
 module valley.robots;
 
+import valley.uri;
+
 import std.string;
 import std.algorithm;
 import std.conv;
@@ -347,3 +349,30 @@ Allow: /other/`);
 }
 
 
+bool canAccess(const Agent agent, const URI uri) pure {
+  string path = (uri.path ~ uri.query).toString;
+
+  auto disallow = agent.disallow.filter!(a => path.indexOf(a) == 0).map!"a.length".array;
+  auto allow = agent.allow.filter!(a => path.indexOf(a) == 0).map!"a.length".array;
+
+  disallow.sort!"a > b";
+  allow.sort!"a > b";
+
+  if(disallow.length > 0 && allow.length > 0) {
+    return disallow[0] < allow[0];
+  }
+
+  return disallow.empty;
+}
+
+/// Check if an uri can be crawled
+unittest {
+  auto robots = Robots(`User-agent: *
+Disallow: /private/
+Allow: /private/document.html`);
+
+  auto agent = robots.get("a");
+  agent.canAccess(URI("/public")).should.equal(true);
+  agent.canAccess(URI("/private/hidden.html")).should.equal(false);
+  agent.canAccess(URI("/private/document.html")).should.equal(true);
+}
