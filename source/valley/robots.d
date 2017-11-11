@@ -1,11 +1,10 @@
+/// http://www.robotstxt.org/norobots-rfc.txt
+/// https://en.wikipedia.org/wiki/Robots_exclusion_standard
 module valley.robots;
 
 import std.string;
 import std.algorithm;
 import std.conv;
-
-/// http://www.robotstxt.org/norobots-rfc.txt
-/// https://en.wikipedia.org/wiki/Robots_exclusion_standard
 
 
 /// An agent rules
@@ -96,7 +95,13 @@ struct Robots {
     string[] currentAgents;
 
     foreach(line; content.lineSplitter.map!(a => a.strip)) {
-      auto pos = line.indexOf(":");
+      auto commentPos = line.indexOf("#");
+      if(commentPos == -1) {
+        commentPos = line.length;
+      }
+
+      line = line[0..commentPos];
+      const auto pos = line.indexOf(":");
 
       if(line == "") {
         currentAgents = [];
@@ -217,3 +222,20 @@ allow: /`);
   robots.agents["a"].allow[0].should.equal("/");
 }
 
+/// Parsing robots.txt with comments
+unittest {
+  auto robots = Robots(`User-agent: googlebot        # all Google services
+Disallow: /private/          # disallow this directory
+
+User-agent: googlebot-news   # only the news service
+Disallow: /                  # disallow everything
+
+User-agent: *                # any robot
+Disallow: /something/        # disallow this directory`);
+
+  robots.agents.length.should.equal(3);
+  robots.agents.keys.should.contain([ "googlebot", "googlebot-news", "*" ]);
+  robots.agents["googlebot"].disallow.should.containOnly([ "/private/" ]);
+  robots.agents["googlebot-news"].disallow.should.containOnly([ "/" ]);
+  robots.agents["*"].disallow.should.containOnly([ "/something/" ]);
+}
