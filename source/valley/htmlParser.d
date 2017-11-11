@@ -116,8 +116,6 @@ unittest {
 }
 
 string toAbsoluteLink(string link, string base) {
-  import std.stdio;
-
   auto linkUri = URI(link);
   auto baseUri = URI(base);
 
