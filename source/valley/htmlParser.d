@@ -13,13 +13,6 @@ import html.dom;
 
 version(unittest) import fluent.asserts;
 
-struct Heading {
-  ubyte level;
-  string text;
-
-  Node* node;
-}
-
 class HTMLDocument {
 
   private {
@@ -37,21 +30,6 @@ class HTMLDocument {
     auto node = doc.querySelector("title");
 
     return node.text.to!string;
-  }
-
-  auto headings() {
-    Heading[] list;
-    byte currentlevel = 1;
-
-    foreach(tag; ["h1", "h2", "h3", "h4", "h5", "h6"]) {
-      foreach(p; doc.querySelectorAll(tag)) {
-        list ~= Heading(currentlevel, p.text.to!string.strip, p.node_);
-      }
-
-      currentlevel++;
-    }
-
-    return list;
   }
 
   string[] links() {
