@@ -5,7 +5,7 @@ module valley.robots;
 import std.string;
 import std.algorithm;
 import std.conv;
-
+import std.datetime;
 
 /// An agent rules
 struct Agent {
@@ -14,6 +14,9 @@ struct Agent {
 
   /// Which routes are allowed to be crawled
   string[] allow;
+
+  /// How much we should wait between the requests
+  Duration crawlDelay;
 }
 
 /// Converts a string to a robot key
@@ -126,6 +129,10 @@ struct Robots {
         if(key == RobotKey.allow) {
           add!(RobotKey.allow)(currentAgents, agents, value);
         }
+
+        if(key == RobotKey.crawlDelay) {
+          add!(RobotKey.crawlDelay)(currentAgents, agents, value);
+        }
       }
     }
 
@@ -133,16 +140,25 @@ struct Robots {
     foreach(string name, properties; agents) {
       string[] disallow;
       string[] allow;
+      Duration crawlDelay = 0.seconds;
 
-      if("disallow" in properties) {
-        disallow = properties["disallow"];
+      if(RobotKey.disallow in properties) {
+        disallow = properties[RobotKey.disallow];
       }
 
-      if("allow" in properties) {
-        allow = properties["allow"];
+      if(RobotKey.allow in properties) {
+        allow = properties[RobotKey.allow];
       }
 
-      tmpAgents[name] = Agent(disallow, allow);
+      if(RobotKey.crawlDelay in properties) {
+        try {
+          crawlDelay = properties[RobotKey.crawlDelay][0].to!uint.seconds;
+        } catch(ConvException) {
+          crawlDelay = 0.seconds;
+        }
+      }
+
+      tmpAgents[name] = Agent(disallow, allow, crawlDelay);
     }
 
     this.agents = cast(immutable) tmpAgents;
@@ -238,4 +254,22 @@ Disallow: /something/        # disallow this directory`);
   robots.agents["googlebot"].disallow.should.containOnly([ "/private/" ]);
   robots.agents["googlebot-news"].disallow.should.containOnly([ "/" ]);
   robots.agents["*"].disallow.should.containOnly([ "/something/" ]);
+}
+
+/// Parsing robots.txt with valid Crawl-delay
+unittest {
+  auto robots = Robots(`User-agent: googlebot
+Crawl-delay: 10`);
+
+  robots.agents.length.should.equal(1);
+  robots.agents["googlebot"].crawlDelay.should.equal(10.seconds);
+}
+
+/// Parsing robots.txt with invalid Crawl-delay
+unittest {
+  auto robots = Robots(`User-agent: googlebot
+Crawl-delay: -10`);
+
+  robots.agents.length.should.equal(1);
+  robots.agents["googlebot"].crawlDelay.should.equal(0.seconds);
 }
