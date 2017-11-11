@@ -1,9 +1,11 @@
 module valley.crawler;
 
-import std.functional;
+import valley.uri;
 
 import vibe.http.client;
 import vibe.stream.operations;
+
+import std.functional;
 import std.socket;
 import std.datetime;
 
@@ -11,7 +13,7 @@ version (unittest) import fluent.asserts;
 
 struct Page
 {
-  string location;
+  URI uri;
   string[string] headers;
   string content;
 }
@@ -24,7 +26,7 @@ class Crawler
     void delegate(scope Page) @system callback;
   }
 
-  void add(string url)
+  void add(URI uri)
   {
 
   }
@@ -44,7 +46,7 @@ class Crawler
         headers[key] = value;
       }
 
-      auto page = Page("http://info.cern.ch/hypertext/WWW/TheProject.html", headers, res.bodyReader.readAllUTF8());
+      auto page = Page(URI("http://info.cern.ch/hypertext/WWW/TheProject.html"), headers, res.bodyReader.readAllUTF8());
 
       callback(page);
     }, settings);
@@ -64,8 +66,9 @@ unittest
 
   crawler.onResult((scope Page page) {
     hasResult = true;
-    page.location.should.equal("http://info.cern.ch/hypertext/WWW/TheProject.html");
+    page.uri.toString.should.equal("http://info.cern.ch/hypertext/WWW/TheProject.html");
     page.content.should.contain("WorldWideWeb");
+
     page.headers.keys.should.containOnly(["Last-Modified",
       "Accept-Ranges",
       "Content-Length",
@@ -74,10 +77,11 @@ unittest
       "Content-Type",
       "Date",
       "ETag"]);
+
     page.headers["Content-Type"].should.equal("text/html");
   });
 
-  crawler.add("http://info.cern.ch/hypertext/WWW/TheProject.html");
+  crawler.add(URI("http://info.cern.ch/hypertext/WWW/TheProject.html"));
   crawler.next;
 
   hasResult.should.equal(true);
