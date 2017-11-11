@@ -6,9 +6,7 @@ import std.string;
 /// https://en.wikipedia.org/wiki/Robots_exclusion_standard
 
 struct Agent {
-  immutable {
-    string[] disallow;
-  }
+  string[] disallow;
 }
 
 struct Robots {
@@ -16,8 +14,8 @@ struct Robots {
   immutable Agent[string] agents;
 
   this(string content) {
+    string[][string][string] agents;
     string currentAgent;
-    string[] disallow;
 
     foreach(line; content.lineSplitter) {
       auto pos = line.indexOf(":");
@@ -27,23 +25,28 @@ struct Robots {
 
         if(pieces[0] == "User-agent") {
           currentAgent = pieces[1].strip;
-          disallow = [];
+          string[][string] emptyList;
+          agents[currentAgent] = emptyList;
         }
 
         if(pieces[0] == "Disallow") {
-          disallow ~= pieces[1].strip;
+          agents[currentAgent]["Disallow"] ~= pieces[1].strip;
         }
       }
     }
 
-    agents[currentAgent] = Agent(disallow.idup);
+    Agent[string] tmpAgents;
+    foreach(string name, properties; agents) {
+      tmpAgents[name] = Agent(properties["Disallow"]);
+    }
+
+    this.agents = cast(immutable) tmpAgents;
   }
 }
 
 version(unittest) {
   import fluent.asserts;
 }
-
 
 /// Parsing a simple robots.txt
 unittest {
@@ -64,7 +67,7 @@ User-agent: b
 Disallow: /
 `);
 
-  robots.agents.length.should.equal(1);
+  robots.agents.length.should.equal(2);
   robots.agents.keys.should.contain([ "a", "b" ]);
   robots.agents["a"].disallow.length.should.equal(1);
   robots.agents["a"].disallow[0].should.equal("/private/");
