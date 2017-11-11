@@ -6,6 +6,7 @@ import std.string;
 import std.algorithm;
 import std.conv;
 import std.datetime;
+import std.array;
 
 /// An agent rules
 struct Agent {
@@ -116,7 +117,7 @@ struct Robots {
             currentAgents = [];
           }
 
-          currentAgents ~= value;
+          currentAgents ~= value.toLower;
           string[][string] emptyList;
           agents[value] = emptyList;
           resetCurrentAgents = false;
@@ -165,6 +166,27 @@ struct Robots {
     }
 
     this.agents = cast(immutable) tmpAgents;
+  }
+
+  immutable(Agent) get(const string agentName) const {
+    string name = agentName.toLower;
+
+    if(agents.keys.canFind(name)) {
+      return agents[name];
+    }
+
+    auto keys = agents.keys.filter!(a => a.indexOf(name) == 0).array;
+    keys.sort!"a.length < b.length";
+
+    if(keys.length > 0) {
+      return agents[keys[0]];
+    }
+
+    if("*" in agents) {
+      return agents["*"];
+    }
+
+    return immutable Agent();
   }
 }
 
@@ -276,7 +298,6 @@ Disallow: /something/`);
   robots.agents["*"].disallow.should.containOnly([ "/something/" ]);
 }
 
-
 /// Parsing robots.txt with valid Crawl-delay
 unittest {
   auto robots = Robots(`User-agent: googlebot
@@ -294,3 +315,35 @@ Crawl-delay: -10`);
   robots.agents.length.should.equal(1);
   robots.agents["googlebot"].crawlDelay.should.equal(0.seconds);
 }
+
+/// Robots should process the rules for a robot
+unittest {
+  auto robots = Robots(`User-agent: googlebot
+Disallow: /private/
+Allow: /public/
+
+User-agent: googlebot-news
+Disallow: /
+
+User-agent: *
+Disallow: /something/
+Allow: /other/`);
+
+  auto agent1 = robots.get("googlebot");
+  agent1.disallow.should.containOnly([ "/private/" ]);
+  agent1.allow.should.containOnly([ "/public/" ]);
+
+  auto agent2 = robots.get("Google");
+  agent2.disallow.should.containOnly([ "/private/" ]);
+  agent2.allow.should.containOnly([ "/public/" ]);
+
+  auto agent3 = robots.get("googlebot-news");
+  agent3.disallow.should.containOnly([ "/" ]);
+  agent3.allow.should.containOnly([ ]);
+
+  auto agent4 = robots.get("bing");
+  agent4.disallow.should.containOnly([ "/something/" ]);
+  agent4.allow.should.containOnly([ "/other/" ]);
+}
+
+
