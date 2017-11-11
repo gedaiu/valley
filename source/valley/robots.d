@@ -96,6 +96,7 @@ struct Robots {
   this(string content) inout {
     string[][string][string] agents;
     string[] currentAgents;
+    bool resetCurrentAgents;
 
     foreach(line; content.lineSplitter.map!(a => a.strip)) {
       auto commentPos = line.indexOf("#");
@@ -104,22 +105,22 @@ struct Robots {
       }
 
       line = line[0..commentPos];
-      const auto pos = line.indexOf(":");
 
-      if(line == "") {
-        currentAgents = [];
-        continue;
-      }
-
-      if(pos != -1) {
+      if(line.indexOf(":") != -1) {
         const auto pieces = line.split(":");
         const string value = pieces[1].strip;
         const RobotKey key = pieces[0].toRobotKey;
 
         if(key == RobotKey.userAgent) {
+          if(resetCurrentAgents) {
+            currentAgents = [];
+          }
+
           currentAgents ~= value;
           string[][string] emptyList;
           agents[value] = emptyList;
+          resetCurrentAgents = false;
+          continue;
         }
 
         if(key == RobotKey.disallow) {
@@ -134,6 +135,8 @@ struct Robots {
           add!(RobotKey.crawlDelay)(currentAgents, agents, value);
         }
       }
+
+      resetCurrentAgents = true;
     }
 
     Agent[string] tmpAgents;
@@ -255,6 +258,24 @@ Disallow: /something/        # disallow this directory`);
   robots.agents["googlebot-news"].disallow.should.containOnly([ "/" ]);
   robots.agents["*"].disallow.should.containOnly([ "/something/" ]);
 }
+
+/// Parsing robots.txt with no new line sepparators
+unittest {
+  auto robots = Robots(`User-agent: googlebot
+Disallow: /private/
+User-agent: googlebot-news
+Disallow: /
+# missing new line
+User-agent: *
+Disallow: /something/`);
+
+  robots.agents.length.should.equal(3);
+  robots.agents.keys.should.contain([ "googlebot", "googlebot-news", "*" ]);
+  robots.agents["googlebot"].disallow.should.containOnly([ "/private/" ]);
+  robots.agents["googlebot-news"].disallow.should.containOnly([ "/" ]);
+  robots.agents["*"].disallow.should.containOnly([ "/something/" ]);
+}
+
 
 /// Parsing robots.txt with valid Crawl-delay
 unittest {
