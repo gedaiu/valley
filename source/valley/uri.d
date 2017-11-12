@@ -220,6 +220,11 @@ struct Path {
   }
 }
 
+/// Convenient function to create a Path struct. Designed to use with UFCS.
+Path path(const string value) pure {
+  return Path(value);
+}
+
 /// Path absolute
 unittest {
   Path("").isAbsolute.should.equal(false);
