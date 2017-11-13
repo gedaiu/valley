@@ -31,13 +31,37 @@ class UriQueue {
   private {
     const(URI)[] queue;
     size_t start;
+    Duration delay;
+
+    bool _busy;
+    SysTime lastFetch;
   }
 
+
   ///
-  this(const Agent agent, const URI baseUri) {
+  this(const Agent agent, const URI baseUri, Duration delay) {
     this.agent = agent;
     this.baseUri = baseUri;
     queue ~= baseUri;
+    lastFetch = Clock.currTime - 1.hours;
+
+    this.delay = delay > agent.crawlDelay ? delay : agent.crawlDelay;
+  }
+
+  bool busy() const {
+    if(_busy) {
+      return true;
+    }
+
+    return Clock.currTime - delay < lastFetch;
+  }
+
+  void busy(bool value) {
+    if(!value) {
+      lastFetch = Clock.currTime;
+    }
+
+    _busy = value;
   }
 
   /// Add a new uri to the queue. If the uri was
@@ -74,7 +98,7 @@ class UriQueue {
 
 /// URIQueue should be initialised with the base uri
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"));
+  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
 
   queue.empty.should.equal(false);
   queue.pop.toString.should.equal("http://example.com/index.html");
@@ -83,7 +107,7 @@ unittest {
 
 /// URIQueue should not be empty after an uri is added
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"));
+  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
   queue.pop(); /// pop the base uri
 
   queue.add(URI("http://example.com/other.html"));
@@ -95,7 +119,7 @@ unittest {
 
 /// URIQueue should be empty if a processed uri is added
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"));
+  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
   queue.pop(); /// pop the base uri
 
   queue.add(URI("http://example.com/index.html"));
@@ -104,7 +128,7 @@ unittest {
 
 /// URIQueue should throw an exception on poping an empty queue
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"));
+  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
   queue.pop(); /// pop the base uri
 
   ({
@@ -114,7 +138,7 @@ unittest {
 
 /// URIQueue should apply robots rules
 unittest {
-  auto queue = new UriQueue(Agent([ "/private/" ]), URI("http://example.com/index.html"));
+  auto queue = new UriQueue(Agent([ "/private/" ]), URI("http://example.com/index.html"), 0.seconds);
   queue.pop(); /// pop the base uri
 
   queue.add(URI("http://example.com/private/page.html"));
@@ -123,7 +147,7 @@ unittest {
 
 /// URIQueue should throw an exception on poping an empty queue
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"));
+  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
 
   ({
     queue.add(URI("http://other.com/index.html"));
@@ -149,16 +173,20 @@ class Crawler
     UriQueue[string] queues;
 
     immutable string agentName;
+    immutable Duration defaultDelay;
   }
 
   ///
-  this(const string agentName) {
+  this(const string agentName, Duration defaultDelay) {
     this.agentName = agentName.idup;
+    this.defaultDelay = defaultDelay;
   }
 
   private void responseHandler(scope Page page)
   {
     this.callback(page);
+    queues[page.uri.host].busy = false;
+    queues[page.uri.host].lastFetch = Clock.currTime;
   }
 
   ///
@@ -170,7 +198,7 @@ class Crawler
     }
 
     void robotsHandler(scope Page page) {
-      queues[uri.host] = new UriQueue(Robots(page.content).get(agentName), uri);
+      queues[uri.host] = new UriQueue(Robots(page.content).get(agentName), uri, defaultDelay);
     }
 
     this.request(uri ~ "/robots.txt".path, &robotsHandler);
@@ -178,12 +206,16 @@ class Crawler
 
   void next()
   {
-    auto freeQueues = queues.byValue.filter!"!a.empty";
+    auto freeQueues = queues
+      .byValue
+        .filter!"!a.empty"
+        .filter!(a => !a.busy);
 
     if(freeQueues.empty) {
       return;
     }
 
+    freeQueues.front.busy = true;
     this.request(freeQueues.front.pop, &responseHandler);
   }
 
@@ -206,7 +238,7 @@ version(unittest) {
 /// GET the robots.txt on the first request
 unittest
 {
-  auto crawler = new Crawler("");
+  auto crawler = new Crawler("", 0.seconds);
   int index;
 
   void requestHandler(const URI uri, void delegate(scope Page) @system callback)
@@ -241,7 +273,7 @@ unittest
 /// GET all the added uris
 unittest
 {
-  auto crawler = new Crawler("");
+  auto crawler = new Crawler("", 0.seconds);
   string[] fetchedUris;
 
   void requestHandler(const URI uri, void delegate(scope Page) @system callback)
@@ -265,13 +297,41 @@ unittest
 /// Do not get anything if the queues are empty
 unittest
 {
-  auto crawler = new Crawler("");
+  auto crawler = new Crawler("", 0.seconds);
 
   ({
     crawler.onRequest(&failureRequest);
     crawler.onResult(&nullSinkResult);
     crawler.next();
   }).should.not.throwAnyException;
+}
+
+/// GET all the added uris applying the crawler delay
+unittest
+{
+  auto crawler = new Crawler("", 1.seconds);
+  string[] fetchedUris;
+
+  int index;
+  void requestHandler(const URI uri, void delegate(scope Page) @system callback)
+  {
+    fetchedUris ~= uri.toString;
+
+    string[string] headers;
+    callback(Page(uri, 200, headers, ""));
+    index++;
+  }
+
+  crawler.onRequest(&requestHandler);
+  crawler.onResult(&nullSinkResult);
+  crawler.add(URI("http://something.com"));
+  crawler.add(URI("http://something.com/page.html"));
+
+  auto begin = Clock.currTime;
+  do {
+    crawler.next();
+  } while(index < 3);
+  (Clock.currTime - begin).should.be.greaterThan(1.seconds);
 }
 
 /// Perform an http request
