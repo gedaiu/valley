@@ -25,7 +25,7 @@ class UriQueue {
 
   private const {
     Agent agent;
-    URI baseUri;
+    Authority authority;
   }
 
   private {
@@ -37,12 +37,10 @@ class UriQueue {
     SysTime lastFetch;
   }
 
-
   ///
-  this(const Agent agent, const URI baseUri, Duration delay) {
+  this(const Agent agent, const Authority authority, Duration delay) {
     this.agent = agent;
-    this.baseUri = baseUri;
-    queue ~= baseUri;
+    this.authority = authority;
     lastFetch = Clock.currTime - 1.hours;
 
     this.delay = delay > agent.crawlDelay ? delay : agent.crawlDelay;
@@ -67,7 +65,7 @@ class UriQueue {
   /// Add a new uri to the queue. If the uri was
   /// previously added it will be ignored
   void add(const URI uri) {
-    enforce(uri.host == baseUri.host , "Can not add uris from a different host.");
+    enforce(uri.host == authority.host , "Can not add uris from a different host.");
 
     if(!agent.canAccess(uri)) {
       return;
@@ -96,19 +94,9 @@ class UriQueue {
   }
 }
 
-/// URIQueue should be initialised with the base uri
-unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
-
-  queue.empty.should.equal(false);
-  queue.pop.toString.should.equal("http://example.com/index.html");
-  queue.empty.should.equal(true);
-}
-
 /// URIQueue should not be empty after an uri is added
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
-  queue.pop(); /// pop the base uri
+  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
 
   queue.add(URI("http://example.com/other.html"));
   queue.empty.should.equal(false);
@@ -119,8 +107,9 @@ unittest {
 
 /// URIQueue should be empty if a processed uri is added
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
-  queue.pop(); /// pop the base uri
+  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
+  queue.add(URI("http://example.com/index.html"));
+  queue.pop;
 
   queue.add(URI("http://example.com/index.html"));
   queue.empty.should.equal(true);
@@ -128,8 +117,7 @@ unittest {
 
 /// URIQueue should throw an exception on poping an empty queue
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
-  queue.pop(); /// pop the base uri
+  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
 
   ({
     queue.pop;
@@ -138,16 +126,15 @@ unittest {
 
 /// URIQueue should apply robots rules
 unittest {
-  auto queue = new UriQueue(Agent([ "/private/" ]), URI("http://example.com/index.html"), 0.seconds);
-  queue.pop(); /// pop the base uri
+  auto queue = new UriQueue(Agent([ "/private/" ]), Authority("example.com"), 0.seconds);
 
   queue.add(URI("http://example.com/private/page.html"));
   queue.empty.should.equal(true);
 }
 
-/// URIQueue should throw an exception on poping an empty queue
+/// URIQueue should throw an exception on adding an uri from a different host
 unittest {
-  auto queue = new UriQueue(Agent(), URI("http://example.com/index.html"), 0.seconds);
+  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
 
   ({
     queue.add(URI("http://other.com/index.html"));
@@ -171,6 +158,7 @@ class Crawler
     void delegate(const URI uri, void delegate(scope Page) @system callback) request;
 
     UriQueue[string] queues;
+    URI[][string] pending;
 
     immutable string agentName;
     immutable Duration defaultDelay;
@@ -197,11 +185,19 @@ class Crawler
       return;
     }
 
+    pending[uri.host] ~= uri;
+
     void robotsHandler(scope Page page) {
-      queues[uri.host] = new UriQueue(Robots(page.content).get(agentName), uri, defaultDelay);
+      queues[uri.host] = new UriQueue(Robots(page.content).get(agentName), uri.authority, defaultDelay);
+
+      foreach(uri; pending[uri.host]) {
+        queues[uri.host].add(uri);
+      }
     }
 
-    this.request(uri ~ "/robots.txt".path, &robotsHandler);
+    if(pending[uri.host].length == 1) {
+      this.request(uri ~ "/robots.txt".path, &robotsHandler);
+    }
   }
 
   void next()
@@ -293,6 +289,46 @@ unittest
 
   fetchedUris.should.contain([ "http://something.com", "http://something.com/page.html" ]);
 }
+
+
+/// It should query robots once
+unittest
+{
+  import std.stdio;
+  import vibe.core.core;
+
+  auto crawler = new Crawler("", 0.seconds);
+  string[] fetchedUris;
+
+  void requestHandler(const URI uri, void delegate(scope Page) @system callback)
+  {
+    yield;
+    fetchedUris ~= uri.toString;
+
+    string[string] headers;
+    callback(Page(uri, 200, headers, ""));
+  }
+
+  crawler.onRequest(&requestHandler);
+  crawler.onResult(&nullSinkResult);
+
+  runTask({
+    crawler.add(URI("http://something.com"));
+  });
+
+  runTask({
+    crawler.add(URI("http://something.com/page.html"));
+  });
+
+  processEvents;
+
+  crawler.next();
+  crawler.next();
+  crawler.next();
+
+  fetchedUris.should.containOnly([ "http://something.com/robots.txt", "http://something.com", "http://something.com/page.html" ]);
+}
+
 
 /// Do not get anything if the queues are empty
 unittest
