@@ -3,25 +3,27 @@
 	"authors": [
 		"Szabo Bogdan"
 	],
-
 	"dependencies": {
 		"vibe-d:stream": "~>0.8.1",
 		"vibe-d:tls": "~>0.8.1",
 		"vibe-d:http": "~>0.8.1",
-		"htmld": "~>0.2.16"
+		"htmld": "~>0.2.16",
+		"d2sqlite3": "~>0.15.0"
 	},
-
-	"configurations": [ {
-		"name": "trial",
-		"dependencies": {
-			"fluent-asserts": "~>0.7.0"
+	"configurations": [
+		{
+			"name": "trial",
+			"dependencies": {
+				"fluent-asserts": "~>0.7.0"
+			}
 		}
-	}],
-
+	],
+	"subConfigurations": {
+		"d2sqlite3": "all-included"
+	},
 	"description": "A minimal D application.",
 	"copyright": "Copyright © 2017, Szabo Bogdan",
 	"license": "MIT",
-
 	"versions": [
 		"VibeDefaultMain"
 	]

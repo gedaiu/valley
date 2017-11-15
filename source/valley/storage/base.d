@@ -23,7 +23,7 @@ struct Badge {
   ubyte[] signature;
 }
 
-struct Information {
+struct PageData {
   string title;
   URI location;
   string description;
@@ -37,6 +37,6 @@ struct Information {
 }
 
 interface Storage {
-  void add(Information);
-  Information[] query(string);
+  void add(PageData);
+  PageData[] query(string);
 }
