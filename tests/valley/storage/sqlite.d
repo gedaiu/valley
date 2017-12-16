@@ -48,6 +48,15 @@ private alias suite = Spec!({
       });
 
       it("should add the page", {
+        storage.exists(URI("http://example.com")).should.equal(true);
+      });
+
+      it("should add the links", {
+        storage.exists(URI("http://example.com/page1")).should.equal(true);
+        storage.exists(URI("http://example.com/page2")).should.equal(true);
+      });
+
+      it("should add the page", {
         Statement statement = db.prepare("SELECT * FROM pages WHERE id = 1 LIMIT 1");
 
         int found = 0;

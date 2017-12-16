@@ -55,6 +55,7 @@ class SQLiteStorage : Storage {
     Statement insertBadge;
     Statement insertLink;
     Statement lastInsertId;
+    Statement pageCount;
 
     Statement selectPage;
   }
@@ -74,6 +75,7 @@ class SQLiteStorage : Storage {
     insertLink = db.prepare("INSERT INTO links (pageId, destinationId) VALUES (:pageId, :destinationId) ");
 
     selectPage = db.prepare("SELECT * FROM pages WHERE location = :location");
+    pageCount = db.prepare("SELECT count(*) FROM pages WHERE location = :location");
 
     lastInsertId = db.prepare("SELECT last_insert_rowid()");
   }
@@ -141,8 +143,7 @@ class SQLiteStorage : Storage {
     return getLastId;
   }
 
-  ulong addPage(PageData data)
-  {
+  ulong addPage(PageData data) {
     insertPage.bind(":title", data.title);
     insertPage.bind(":location", data.location.toString);
     insertPage.bind(":description", data.description);
@@ -174,9 +175,16 @@ class SQLiteStorage : Storage {
     return pageId;
   }
 
-  PageData[] query(string data)
-  {
+  PageData[] query(string data) {
     return [];
+  }
+
+  bool exists(URI location) {
+    pageCount.bind(":location", location.toString);
+    auto result = pageCount.execute.oneValue!long > 0;
+
+    pageCount.reset;
+    return result;
   }
 
   void close() {
@@ -187,6 +195,7 @@ class SQLiteStorage : Storage {
     insertBadge.finalize;
     insertLink.finalize;
     selectPage.finalize;
+    pageCount.finalize;
 
     db.close;
   }
