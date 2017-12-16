@@ -4,7 +4,8 @@
 		"result"
 	],
 	"testDiscovery": [
-		"trial.discovery.unit.UnitTestDiscovery"
+		"trial.discovery.unit.UnitTestDiscovery",
+		"trial.discovery.spec.SpecTestDiscovery"
 	],
 	"runInParallel": false,
 	"maxThreads": 0
