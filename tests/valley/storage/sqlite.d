@@ -18,7 +18,7 @@ private alias suite = Spec!({
       SQLiteStorage storage;
       Database db;
 
-      before({
+      beforeEach({
         if("data.db".exists) {
           "data.db".remove;
         }
@@ -42,7 +42,7 @@ private alias suite = Spec!({
         db = Database("data.db");
       });
 
-      after({
+      afterEach({
         storage.close;
         "data.db".remove;
       });
@@ -54,6 +54,18 @@ private alias suite = Spec!({
       it("should add the links", {
         storage.exists(URI("http://example.com/page1")).should.equal(true);
         storage.exists(URI("http://example.com/page2")).should.equal(true);
+      });
+
+      it("should contain only 3 pages", {
+        Statement statement = db.prepare("SELECT * FROM pages");
+
+        string[] pages;
+        foreach (Row row; statement.execute) {
+          pages ~= row["location"].as!string;
+        }
+
+        statement.finalize;
+        pages.should.containOnly([ "http://example.com", "http://example.com/page1", "http://example.com/page2"]);
       });
 
       it("should add the page", {
@@ -120,6 +132,108 @@ private alias suite = Spec!({
 
         statement.finalize;
         strLinks.should.containOnly([ "1.2", "1.3" ]);
+      });
+
+      describe("and updated", {
+        beforeEach({
+          Badge[] badges = [ Badge(BadgeType.approve, [1, 2, 3]) ];
+          auto data = PageData(
+            "some other title",
+            URI("http://example.com/"),
+            "some other description",
+            Clock.currTime,
+
+            [ URI("http://example.com/page3"), URI("http://example.com/page4") ],
+            badges,
+            [ "other", "keywords" ],
+            InformationType.webPage
+          );
+
+          storage.add(data);
+        });
+
+        it("should update the fields", {
+          Statement statement = db.prepare("SELECT * FROM pages WHERE id = 1 LIMIT 1");
+
+          int found = 0;
+          foreach (Row row; statement.execute) {
+            row["id"].as!int.should.equal(1);
+            row["title"].as!string.should.equal("some other title");
+            row["location"].as!string.should.equal("http://example.com");
+            row["description"].as!string.should.equal("some other description");
+            row["time"].as!ulong.should.be.approximately(Clock.currTime.toUnixTime, 2000);
+            row["type"].as!int.should.equal(0);
+            found++;
+          }
+
+          statement.finalize;
+          found.should.equal(1);
+        });
+
+        it("should contain only 4 pages", {
+          Statement statement = db.prepare("SELECT * FROM pages");
+
+          string[] pages;
+          foreach (Row row; statement.execute) {
+            pages ~= row["location"].as!string;
+          }
+
+          statement.finalize;
+          pages.should.containOnly([
+            "http://example.com",
+            "http://example.com/page1",
+            "http://example.com/page2",
+            "http://example.com/page3",
+            "http://example.com/page4"]);
+        });
+      });
+
+      describe("and removed", {
+        beforeEach({
+          storage.remove(URI("http://example.com/"));
+        });
+
+        it("should remove the page", {
+          storage.exists(URI("http://example.com")).should.equal(false);
+        });
+
+        it("should not remove the linked page", {
+          Statement statement = db.prepare("SELECT * FROM pages");
+
+          string[] pages;
+          foreach (Row row; statement.execute) {
+            pages ~= row["location"].as!string;
+          }
+
+          statement.finalize;
+          pages.should.containOnly([
+            "http://example.com/page1",
+            "http://example.com/page2"]);
+        });
+
+        it("should not remove the keywords", {
+          auto statement = db.prepare("SELECT * FROM keywords");
+
+          string[] keywords;
+          foreach (Row row; statement.execute) {
+            keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string;
+          }
+
+          statement.finalize;
+          keywords.should.containOnly([ "1.some", "2.keywords" ]);
+        });
+
+        it("should remove the keywordLinks", {
+          db.execute("SELECT count(*) FROM keywordLinks").oneValue!long.should.equal(0);
+        });
+
+        it("should remove the badges", {
+          db.execute("SELECT count(*) FROM badges").oneValue!long.should.equal(0);
+        });
+
+        it("should remove the links", {
+          db.execute("SELECT count(*) FROM links").oneValue!long.should.equal(0);
+        });
       });
     });
   });

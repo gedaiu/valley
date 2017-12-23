@@ -38,5 +38,6 @@ struct PageData {
 
 interface Storage {
   void add(PageData);
+  void remove(URI);
   PageData[] query(string);
 }

@@ -46,18 +46,171 @@ void setupSqliteDb(string fileName) {
   db.close;
 }
 
+class KeywordStorage {
+  private {
+    Statement insertKeyword;
+    Statement insertKeywordLinks;
+    Statement removePageId;
+    Statement lastInsertId;
+
+    Database db;
+  }
+
+  this(Database db) {
+    insertKeywordLinks = db.prepare("INSERT INTO keywordLinks (keywordId, pageId) VALUES (:keywordId, :pageId) ");
+    insertKeyword = db.prepare("INSERT INTO keywords (keyword) VALUES (:keyword) ");
+    removePageId = db.prepare("DELETE FROM keywordLinks WHERE pageId = :pageId");
+    lastInsertId = db.prepare("SELECT last_insert_rowid()");
+
+    this.db = db;
+  }
+
+  ulong getLastId() {
+    ulong id = lastInsertId.execute.oneValue!ulong;
+    lastInsertId.reset;
+
+    return id;
+  }
+
+  ulong add(string value) {
+    insertKeyword.bind(":keyword", value);
+    insertKeyword.execute;
+    insertKeyword.reset;
+
+    return getLastId;
+  }
+
+  ulong link(ulong pageId, ulong keywordId) {
+    insertKeywordLinks.bind(":keywordId", keywordId);
+    insertKeywordLinks.bind(":pageId", pageId);
+
+    insertKeywordLinks.execute;
+    insertKeywordLinks.reset;
+
+    return getLastId;
+  }
+
+  void removeByPageId(ulong pageId) {
+    removePageId.bind(":pageId", pageId);
+    removePageId.execute;
+    removePageId.reset;
+  }
+
+  void close() {
+    removePageId.finalize;
+    insertKeyword.finalize;
+    insertKeywordLinks.finalize;
+    lastInsertId.finalize;
+  }
+}
+
+class BadgeStorage {
+
+  private {
+    Statement insertBadge;
+    Statement removePageId;
+    Statement lastInsertId;
+    Database db;
+  }
+
+  this(Database db) {
+    insertBadge = db.prepare("INSERT INTO badges (pageId, type, signature) VALUES (:pageId, :type, :signature) ");
+    removePageId = db.prepare("DELETE FROM badges WHERE pageId = :pageId");
+    lastInsertId = db.prepare("SELECT last_insert_rowid()");
+
+    this.db = db;
+  }
+
+  ulong getLastId() {
+    ulong id = lastInsertId.execute.oneValue!ulong;
+    lastInsertId.reset;
+
+    return id;
+  }
+
+  ulong add(ulong pageId, BadgeType type, ubyte[] signature) {
+    insertBadge.bind(":pageId", pageId);
+    insertBadge.bind(":type", type);
+    insertBadge.bind(":signature", signature);
+    insertBadge.execute;
+    insertBadge.reset;
+
+    return getLastId;
+  }
+
+  void removeByPageId(ulong pageId) {
+    removePageId.bind(":pageId", pageId);
+    removePageId.execute;
+    removePageId.reset;
+  }
+
+  void close() {
+    insertBadge.finalize;
+    removePageId.finalize;
+    lastInsertId.finalize;
+  }
+}
+
+class LinkStorage {
+  private {
+    Statement insertLink;
+    Statement removePageId;
+    Statement lastInsertId;
+    Database db;
+  }
+
+  this(Database db) {
+    insertLink = db.prepare("INSERT INTO links (pageId, destinationId) VALUES (:pageId, :destinationId) ");
+    removePageId = db.prepare("DELETE FROM links WHERE pageId = :pageId");
+    lastInsertId = db.prepare("SELECT last_insert_rowid()");
+
+    this.db = db;
+  }
+
+  ulong getLastId() {
+    ulong id = lastInsertId.execute.oneValue!ulong;
+    lastInsertId.reset;
+
+    return id;
+  }
+
+  ulong add(ulong pageId, ulong destinationId) {
+    insertLink.bind(":pageId", pageId);
+    insertLink.bind(":destinationId", destinationId);
+    insertLink.execute;
+    insertLink.reset;
+
+    return getLastId;
+  }
+
+  void removeByPageId(ulong pageId) {
+    removePageId.bind(":pageId", pageId);
+    removePageId.execute;
+    removePageId.reset;
+  }
+
+  void close() {
+    insertLink.finalize;
+    removePageId.finalize;
+    lastInsertId.finalize;
+  }
+}
+
 class SQLiteStorage : Storage {
   private {
     Database db;
+    KeywordStorage keywordStorage;
+    BadgeStorage badgeStorage;
+    LinkStorage linkStorage;
+
     Statement insertPage;
-    Statement insertKeyword;
-    Statement insertKeywordLinks;
-    Statement insertBadge;
-    Statement insertLink;
+    Statement updatePage;
+    Statement deletePage;
     Statement lastInsertId;
     Statement pageCount;
 
     Statement selectPage;
+    Statement pageId;
   }
 
   this(string fileName) {
@@ -66,16 +219,21 @@ class SQLiteStorage : Storage {
     }
 
     db = Database(fileName);
+    keywordStorage = new KeywordStorage(db);
+    badgeStorage = new BadgeStorage(db);
+    linkStorage = new LinkStorage(db);
+
     insertPage = db.prepare("INSERT INTO pages (title,  location,   description,  time,  type)
                                         VALUES (:title, :location, :description, :time, :type )");
 
-    insertKeyword = db.prepare("INSERT INTO keywords (keyword) VALUES (:keyword) ");
-    insertBadge = db.prepare("INSERT INTO badges (pageId, type, signature) VALUES (:pageId, :type, :signature) ");
-    insertKeywordLinks = db.prepare("INSERT INTO keywordLinks (keywordId, pageId) VALUES (:keywordId, :pageId) ");
-    insertLink = db.prepare("INSERT INTO links (pageId, destinationId) VALUES (:pageId, :destinationId) ");
+    deletePage = db.prepare("DELETE FROM pages WHERE id = :id");
+
+    updatePage = db.prepare("UPDATE pages SET title=:title, location=:location, description=:description,
+                              time=:time, type=:type WHERE id=:id");
 
     selectPage = db.prepare("SELECT * FROM pages WHERE location = :location");
     pageCount = db.prepare("SELECT count(*) FROM pages WHERE location = :location");
+    pageId = db.prepare("SELECT id FROM pages WHERE location = :location");
 
     lastInsertId = db.prepare("SELECT last_insert_rowid()");
   }
@@ -87,32 +245,20 @@ class SQLiteStorage : Storage {
     return id;
   }
 
-  ulong addKeyword(string value) {
-    insertKeyword.bind(":keyword", value);
-    insertKeyword.execute;
-    insertKeyword.reset;
+  void remove(URI location) {
+    if(!exists(location)) {
+      return;
+    }
 
-    return getLastId;
-  }
+    auto id = getPageId(location);
 
-  ulong addBadge(ulong pageId, BadgeType type, ubyte[] signature) {
-    insertBadge.bind(":pageId", pageId);
-    insertBadge.bind(":type", type);
-    insertBadge.bind(":signature", signature);
-    insertBadge.execute;
-    insertBadge.reset;
+    deletePage.bind(":id", id);
+    deletePage.execute;
+    deletePage.reset;
 
-    return getLastId;
-  }
-
-  ulong addKeywordLink(ulong pageId, ulong keywordId) {
-    insertKeywordLinks.bind(":keywordId", keywordId);
-    insertKeywordLinks.bind(":pageId", pageId);
-
-    insertKeywordLinks.execute;
-    insertKeywordLinks.reset;
-
-    return getLastId;
+    keywordStorage.removeByPageId(id);
+    badgeStorage.removeByPageId(id);
+    linkStorage.removeByPageId(id);
   }
 
   void add(PageData data) {
@@ -120,59 +266,67 @@ class SQLiteStorage : Storage {
   }
 
   ulong getPageId(URI location) {
-    selectPage.bind(":location", location.toString);
-    scope(exit) selectPage.reset;
+    pageId.bind(":location", location.toString);
+    scope(exit) pageId.reset;
 
-    auto result = selectPage.execute;
+    auto result = pageId.execute;
 
     if(result.empty) {
       return addPage(PageData("", location));
     }
 
-    assert(false);
-  }
-
-  ulong addLink(ulong pageId, URI location) {
-    auto destinationId = getPageId(location);
-
-    insertLink.bind(":pageId", pageId);
-    insertLink.bind(":destinationId", destinationId);
-    insertLink.execute;
-    insertLink.reset;
-
-    return getLastId;
+    return result.oneValue!ulong;
   }
 
   ulong addPage(PageData data) {
-    insertPage.bind(":title", data.title);
-    insertPage.bind(":location", data.location.toString);
-    insertPage.bind(":description", data.description);
-    insertPage.bind(":time", data.time.toUnixTime);
-    insertPage.bind(":type", data.type.to!int);
+    ulong id;
 
-    insertPage.execute;
-    insertPage.reset;
+    if(!exists(data.location)) {
+      insertPage.bind(":title", data.title);
+      insertPage.bind(":location", data.location.toString);
+      insertPage.bind(":description", data.description);
+      insertPage.bind(":time", data.time.toUnixTime);
+      insertPage.bind(":type", data.type.to!int);
 
-    auto pageId = getLastId;
+      insertPage.execute;
+      insertPage.reset;
+      insertPage.clearBindings;
+
+      id = getLastId;
+    } else {
+      id = getPageId(data.location);
+
+      updatePage.bind(":id", id);
+      updatePage.bind(":title", data.title);
+      updatePage.bind(":location", data.location.toString);
+      updatePage.bind(":description", data.description);
+      updatePage.bind(":time", data.time.toUnixTime);
+      updatePage.bind(":type", data.type.to!int);
+
+      updatePage.execute;
+      updatePage.reset;
+      updatePage.clearBindings;
+    }
+
     ulong[] keywords;
 
     foreach(keyword; data.keywords) {
-      keywords ~= addKeyword(keyword);
+      keywords ~= keywordStorage.add(keyword);
     }
 
     foreach(keywordId; keywords) {
-      addKeywordLink(pageId, keywordId);
+      keywordStorage.link(id, keywordId);
     }
 
     foreach(badge; data.badges) {
-      addBadge(pageId, badge.type, badge.signature);
+      badgeStorage.add(id, badge.type, badge.signature);
     }
 
     foreach(location; data.relations) {
-      addLink(pageId, location);
+      linkStorage.add(id, getPageId(location));
     }
 
-    return pageId;
+    return id;
   }
 
   PageData[] query(string data) {
@@ -181,21 +335,23 @@ class SQLiteStorage : Storage {
 
   bool exists(URI location) {
     pageCount.bind(":location", location.toString);
-    auto result = pageCount.execute.oneValue!long > 0;
+    scope(exit) pageCount.reset;
 
-    pageCount.reset;
-    return result;
+    return pageCount.execute.oneValue!long > 0;
   }
 
   void close() {
+    keywordStorage.close;
+    badgeStorage.close;
+    linkStorage.close;
+
     insertPage.finalize;
-    insertKeyword.finalize;
-    insertKeywordLinks.finalize;
+    updatePage.finalize;
     lastInsertId.finalize;
-    insertBadge.finalize;
-    insertLink.finalize;
     selectPage.finalize;
     pageCount.finalize;
+    pageId.finalize;
+    deletePage.finalize;
 
     db.close;
   }

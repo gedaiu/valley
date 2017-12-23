@@ -341,7 +341,7 @@ Allow: /other/`);
 
   auto agent3 = robots.get("googlebot-news");
   agent3.disallow.should.containOnly([ "/" ]);
-  agent3.allow.should.containOnly([ ]);
+  agent3.allow.length.should.equal(0);
 
   auto agent4 = robots.get("bing");
   agent4.disallow.should.containOnly([ "/something/" ]);
