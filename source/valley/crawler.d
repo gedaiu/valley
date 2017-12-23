@@ -141,8 +141,7 @@ unittest {
   }).should.throwAnyException.withMessage.equal("Can not add uris from a different host.");
 }
 
-struct Page
-{
+struct CrawlPage {
   URI uri;
   int statusCode;
   string[string] headers;
@@ -154,8 +153,8 @@ class Crawler
 {
   private
   {
-    void delegate(scope Page) callback;
-    void delegate(const URI uri, void delegate(scope Page) @system callback) request;
+    void delegate(scope CrawlPage) callback;
+    void delegate(const URI uri, void delegate(scope CrawlPage) @system callback) request;
 
     UriQueue[string] queues;
     URI[][string] pending;
@@ -170,7 +169,7 @@ class Crawler
     this.defaultDelay = defaultDelay;
   }
 
-  private void responseHandler(scope Page page)
+  private void responseHandler(scope CrawlPage page)
   {
     this.callback(page);
     queues[page.uri.host].busy = false;
@@ -187,7 +186,7 @@ class Crawler
 
     pending[uri.host] ~= uri;
 
-    void robotsHandler(scope Page page) {
+    void robotsHandler(scope CrawlPage page) {
       queues[uri.host] = new UriQueue(Robots(page.content).get(agentName), uri.authority, defaultDelay);
 
       foreach(uri; pending[uri.host]) {
@@ -227,8 +226,8 @@ class Crawler
 }
 
 version(unittest) {
-  void nullSinkResult(scope Page) { }
-  void failureRequest(const URI uri, void delegate(scope Page) @system callback) { assert(false, "No request should be performed"); }
+  void nullSinkResult(scope CrawlPage) { }
+  void failureRequest(const URI uri, void delegate(scope CrawlPage) @system callback) { assert(false, "No request should be performed"); }
 }
 
 /// GET the robots.txt on the first request
@@ -237,7 +236,7 @@ unittest
   auto crawler = new Crawler("", 0.seconds);
   int index;
 
-  void requestHandler(const URI uri, void delegate(scope Page) @system callback)
+  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
   {
     scope (exit)
     {
@@ -255,7 +254,7 @@ unittest
     }
 
     string[string] headers;
-    callback(Page(uri, 200, headers, ""));
+    callback(CrawlPage(uri, 200, headers, ""));
   }
 
   crawler.onRequest(&requestHandler);
@@ -272,12 +271,12 @@ unittest
   auto crawler = new Crawler("", 0.seconds);
   string[] fetchedUris;
 
-  void requestHandler(const URI uri, void delegate(scope Page) @system callback)
+  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
   {
     fetchedUris ~= uri.toString;
 
     string[string] headers;
-    callback(Page(uri, 200, headers, ""));
+    callback(CrawlPage(uri, 200, headers, ""));
   }
 
   crawler.onRequest(&requestHandler);
@@ -300,13 +299,13 @@ unittest
   auto crawler = new Crawler("", 0.seconds);
   string[] fetchedUris;
 
-  void requestHandler(const URI uri, void delegate(scope Page) @system callback)
+  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
   {
     yield;
     fetchedUris ~= uri.toString;
 
     string[string] headers;
-    callback(Page(uri, 200, headers, ""));
+    callback(CrawlPage(uri, 200, headers, ""));
   }
 
   crawler.onRequest(&requestHandler);
@@ -349,12 +348,12 @@ unittest
   string[] fetchedUris;
 
   int index;
-  void requestHandler(const URI uri, void delegate(scope Page) @system callback)
+  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
   {
     fetchedUris ~= uri.toString;
 
     string[string] headers;
-    callback(Page(uri, 200, headers, ""));
+    callback(CrawlPage(uri, 200, headers, ""));
     index++;
   }
 
@@ -371,7 +370,7 @@ unittest
 }
 
 /// Perform an http request
-void request(const URI uri, void delegate(scope Page) callback)
+void request(const URI uri, void delegate(scope CrawlPage) callback)
 {
   HTTPClientSettings settings = new HTTPClientSettings;
   settings.dnsAddressFamily = AddressFamily.INET;
@@ -384,7 +383,7 @@ void request(const URI uri, void delegate(scope Page) callback)
       headers[key] = value;
     }
 
-    auto page = Page(uri, res.statusCode, headers, res.bodyReader.readAllUTF8());
+    auto page = CrawlPage(uri, res.statusCode, headers, res.bodyReader.readAllUTF8());
 
     callback(page);
   }, settings);
@@ -394,11 +393,11 @@ void request(const URI uri, void delegate(scope Page) callback)
 unittest
 {
   bool hasResult;
-  string firstPage = "http://info.cern.ch/hypertext/WWW/TheProject.html";
+  string firstCrawlPage = "http://info.cern.ch/hypertext/WWW/TheProject.html";
 
-  request(URI(firstPage), (scope Page page) {
+  request(URI(firstCrawlPage), (scope CrawlPage page) {
     hasResult = true;
-    page.uri.toString.should.equal(firstPage);
+    page.uri.toString.should.equal(firstCrawlPage);
     page.statusCode.should.equal(200);
     page.content.should.contain("WorldWideWeb");
 

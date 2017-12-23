@@ -8,6 +8,7 @@ import std.conv;
 import std.string;
 import std.algorithm;
 import std.array;
+import std.math;
 
 import html.dom;
 
@@ -64,11 +65,15 @@ class HTMLDocument {
   string preview() {
     foreach(p; doc.querySelectorAll("meta")) {
       if(p.hasAttr("name") && p.hasAttr("content") && p.attr("name").toLower == "description") {
-        return p.attr("content").to!string;
+        return p.attr("content").to!string.strip;
       }
     }
 
-    return plainText[0..100];
+    auto text = plainText.strip;
+
+    size_t len = min(100, text.length);
+
+    return text[0..len];
   }
 }
 

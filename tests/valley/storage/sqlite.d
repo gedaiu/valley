@@ -19,11 +19,11 @@ private alias suite = Spec!({
       Database db;
 
       beforeEach({
-        if("data.db".exists) {
-          "data.db".remove;
+        if("test.db".exists) {
+          "test.db".remove;
         }
 
-        storage = new SQLiteStorage("data.db");
+        storage = new SQLiteStorage("test.db");
 
         Badge[] badges = [ Badge(BadgeType.approve, [1, 2, 3]) ];
         auto data = PageData(
@@ -39,12 +39,12 @@ private alias suite = Spec!({
         );
 
         storage.add(data);
-        db = Database("data.db");
+        db = Database("test.db");
       });
 
       afterEach({
         storage.close;
-        "data.db".remove;
+        "test.db".remove;
       });
 
       it("should add the page", {

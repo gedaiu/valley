@@ -10,3 +10,5 @@ trial_root.d
 /valley
 valley-test-trial
 coverage/
+*.db
+libvalley.a
