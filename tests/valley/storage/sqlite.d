@@ -188,6 +188,89 @@ private alias suite = Spec!({
         });
       });
 
+      describe("and updated with less child items", {
+        beforeEach({
+          Badge[] badges = [ Badge(BadgeType.authenticity, [1, 2, 3]) ];
+          auto data = PageData(
+            "some other title",
+            URI("http://example.com/"),
+            "some other description",
+            Clock.currTime,
+
+            [ URI("http://example.com/page4") ],
+            badges,
+            [ "new" ],
+            InformationType.webPage
+          );
+
+          storage.add(data);
+        });
+
+        it("should contain only 3 pages", {
+          Statement statement = db.prepare("SELECT * FROM pages");
+
+          string[] pages;
+          foreach (Row row; statement.execute) {
+            pages ~= row["location"].as!string;
+          }
+
+          statement.finalize;
+          pages.should.containOnly([
+            "http://example.com",
+            "http://example.com/page1",
+            "http://example.com/page2",
+            "http://example.com/page4"]);
+        });
+
+        it("should add the new keyword", {
+          auto statement = db.prepare("SELECT * FROM keywords");
+
+          string[] keywords;
+          foreach (Row row; statement.execute) {
+            keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string;
+          }
+
+          statement.finalize;
+          keywords.should.containOnly([ "1.some", "2.keywords", "3.new"]);
+        });
+
+        it("should update the keywordLinks", {
+          auto statement = db.prepare("SELECT * FROM keywordLinks");
+
+          string[] keywordLinks;
+          foreach (Row row; statement.execute) {
+            keywordLinks ~= row["pageId"].as!string ~ "." ~ row["keywordId"].as!string;
+          }
+
+          statement.finalize;
+          keywordLinks.should.containOnly([ "1.3" ]);
+        });
+
+        it("should update the badge", {
+          auto statement = db.prepare("SELECT * FROM badges");
+
+          string[] strBadges;
+          foreach (Row row; statement.execute) {
+            strBadges ~= row["pageId"].as!string ~ " " ~ row["type"].as!string ~ " " ~ row["signature"].as!string;
+          }
+
+          statement.finalize;
+          strBadges.should.containOnly([ "1 3 [1, 2, 3]" ]);
+        });
+
+        it("should update the links", {
+          auto statement = db.prepare("SELECT * FROM links");
+
+          string[] strLinks;
+          foreach (Row row; statement.execute) {
+            strLinks ~= row["pageId"].as!string ~ "." ~ row["destinationId"].as!string;
+          }
+
+          statement.finalize;
+          strLinks.should.containOnly([ "1.4" ]);
+        });
+      });
+
       describe("and removed", {
         beforeEach({
           storage.remove(URI("http://example.com/"));
