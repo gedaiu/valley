@@ -41,7 +41,7 @@ void crawlerResult(scope CrawlPage crawlPage) {
 
     document.links.map!(a => URI(a)).array,
     [],
-    document.plainText.split(" ").filter!(a => a.length < 4).array,
+    document.plainText.split(" ").map!(a => a.strip).filter!(a => a.length > 4).array,
     InformationType.webPage
   );
 
@@ -99,9 +99,20 @@ int main() {
   crawler.onResult(&crawlerResult);
 
   runTask({
-    crawler.add(URI("http://dlang.org"));
-    crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
-    crawler.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
+    auto seed = storage.pending(0.seconds);
+
+    if(seed.length == 0) {
+      writeln("There are no expired pages. Using the default seed.");
+      crawler.add(URI("http://dlang.org"));
+      crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
+      crawler.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
+      return;
+    }
+
+    foreach(uri; seed) {
+      writeln(uri.toString);
+      crawler.add(uri);
+    }
   });
 
   runTask({

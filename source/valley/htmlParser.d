@@ -83,7 +83,7 @@ unittest {
   auto html = new HTMLDocument(URI("https://twitter.com/c3daysleft?lang=en"), rawHtml);
 
   html.title.should.equal("Waiting for 34C3 (@c3daysleft) | Twitter");
-  html.preview.should.equal(html.plainText[0..100]);
+  html.preview.should.equal(html.plainText.strip[0..100]);
   html.links.length.should.be.greaterThan(0);
 }
 

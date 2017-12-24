@@ -40,4 +40,6 @@ interface Storage {
   void add(PageData);
   void remove(URI);
   PageData[] query(string);
+
+  URI[] pending(Duration);
 }

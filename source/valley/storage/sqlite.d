@@ -291,6 +291,7 @@ class SQLiteStorage : Storage {
     Statement updatePage;
     Statement deletePage;
     Statement lastInsertId;
+    Statement expiredPages;
     Statement pageCount;
 
     Statement selectPage;
@@ -318,6 +319,7 @@ class SQLiteStorage : Storage {
     selectPage = db.prepare("SELECT * FROM pages WHERE location = :location");
     pageCount = db.prepare("SELECT count(*) FROM pages WHERE location = :location");
     pageId = db.prepare("SELECT id FROM pages WHERE location = :location");
+    expiredPages = db.prepare("SELECT location FROM pages WHERE time < :time");
 
     lastInsertId = db.prepare("SELECT last_insert_rowid()");
   }
@@ -360,6 +362,21 @@ class SQLiteStorage : Storage {
     }
 
     return result.oneValue!ulong;
+  }
+
+  URI[] pending(Duration expire) {
+    URI[] list = [];
+
+    auto time = Clock.currTime - expire;
+    expiredPages.bind(":time", time.toUnixTime);
+
+    foreach (Row row; expiredPages.execute) {
+      list ~= URI(row["location"].as!string);
+    }
+
+    expiredPages.reset;
+
+    return list;
   }
 
   ulong addPage(PageData data) {
@@ -461,6 +478,7 @@ class SQLiteStorage : Storage {
     pageCount.finalize;
     pageId.finalize;
     deletePage.finalize;
+    expiredPages.finalize;
 
     db.close;
   }

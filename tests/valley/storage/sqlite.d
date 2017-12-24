@@ -56,6 +56,10 @@ private alias suite = Spec!({
         storage.exists(URI("http://example.com/page2")).should.equal(true);
       });
 
+      it("should mark empty pages as pending", {
+        storage.pending(0.seconds).should.containOnly([ URI("http://example.com/page1"), URI("http://example.com/page2")]);
+      });
+
       it("should contain only 3 pages", {
         Statement statement = db.prepare("SELECT * FROM pages");
 
