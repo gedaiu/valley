@@ -138,6 +138,35 @@ private alias suite = Spec!({
         strLinks.should.containOnly([ "1.2", "1.3" ]);
       });
 
+      describe("and add a new page with the same keywords", {
+        beforeEach({
+          auto data = PageData(
+            "some title",
+            URI("http://example.com/"),
+            "some description",
+            Clock.currTime,
+            [],
+            [],
+            [ "some", "keywords" ],
+            InformationType.webImage
+          );
+
+          storage.add(data);
+        });
+
+        it("should have the keywords once", {
+          auto statement = db.prepare("SELECT * FROM keywords");
+
+          string[] keywords;
+          foreach (Row row; statement.execute) {
+            keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string;
+          }
+
+          statement.finalize;
+          keywords.should.containOnly([ "1.some", "2.keywords" ]);
+        });
+      });
+
       describe("and updated", {
         beforeEach({
           Badge[] badges = [ Badge(BadgeType.approve, [1, 2, 3]) ];

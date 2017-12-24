@@ -55,6 +55,7 @@ class KeywordStorage {
     Statement selectPageLinks;
     Statement unlinkPage;
     Statement lastInsertId;
+    Statement selectKeyword;
 
     Database db;
   }
@@ -63,6 +64,7 @@ class KeywordStorage {
     insertKeywordLinks = db.prepare("INSERT INTO keywordLinks (keywordId, pageId) VALUES (:keywordId, :pageId) ");
     insertKeyword = db.prepare("INSERT INTO keywords (keyword) VALUES (:keyword) ");
     removePageId = db.prepare("DELETE FROM keywordLinks WHERE pageId = :pageId");
+    selectKeyword = db.prepare("SELECT id FROM keywords WHERE keyword = :keyword");
     selectPageLinks = db.prepare("SELECT keywordId FROM keywordLinks WHERE pageId = :pageId");
     unlinkPage = db.prepare("DELETE FROM keywordLinks WHERE pageId = :pageId AND keywordId = :keywordId");
     lastInsertId = db.prepare("SELECT last_insert_rowid()");
@@ -78,6 +80,14 @@ class KeywordStorage {
   }
 
   ulong add(string value) {
+    selectKeyword.bind(":keyword", value);
+    auto result = selectKeyword.execute;
+    scope(exit) selectKeyword.reset;
+
+    if(!result.empty) {
+      return result.oneValue!ulong;
+    }
+
     insertKeyword.bind(":keyword", value);
     insertKeyword.execute;
     insertKeyword.reset;
@@ -129,6 +139,7 @@ class KeywordStorage {
     unlinkPage.finalize;
     selectPageLinks.finalize;
     lastInsertId.finalize;
+    selectKeyword.finalize;
   }
 }
 
