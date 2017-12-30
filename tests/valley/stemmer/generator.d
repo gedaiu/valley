@@ -35,6 +35,12 @@ private alias suite = Spec!({
     });
 
     describe("english alphabet", {
+
+      it("should get the regions for 'consignment'", {
+        EnglishAlphabet.region1("consignment").should.equal("signment");
+        EnglishAlphabet.region2("consignment").should.equal("nment");
+      });
+
       it("should get the regions for 'beautiful'", {
         EnglishAlphabet.region1("beautiful").should.equal("iful");
         EnglishAlphabet.region2("beautiful").should.equal("ul");

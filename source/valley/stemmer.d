@@ -209,14 +209,20 @@ immutable class Or : IStemOperation {
   }
 
   string get(const string value) pure {
+    import std.stdio;
+    debug writeln("OR ", value);
+
     foreach(andList; list) {
       auto result = And(andList).get(value);
 
       if(result != "") {
+        debug writeln("OR Result", result);
         return result;
       }
     }
 
+
+    debug writeln("OR Done");
     return "";
   }
 }
@@ -263,6 +269,9 @@ immutable class RemovePostifixFromRegion(T) : StemOperationFromRegion!T {
   string get(const string value) pure {
     string strRegion = getRegion(value);
 
+    import std.stdio;
+    debug writeln("strRegion: ", T.region1(value), " ", T.region2(value), " ", value, " ", postfix, " ", strRegion.endsWith(postfix));
+
     if(strRegion.endsWith(postfix)) {
       return value[0..$ - strRegion.length] ~ strRegion[0..$ - postfix.length];
     }
@@ -289,8 +298,10 @@ immutable class ReplaceFromRegion(T) : StemOperationFromRegion!T {
   }
 
   string get(const string value) pure {
+    import std.stdio;
+    debug writeln("GET: ", value);
     string strRegion = getRegion(value);
-
+    debug writeln("Replace from region: ", strRegion, " ", from, " ", to);
     return value[0..$ - strRegion.length] ~ strRegion.replace(from, to);
   }
 }
@@ -354,6 +365,14 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
       extraLetters;
 
       string[] nonVowels = removeLetters(alphabet, vowels);
+    }
+
+    bool isVowel(dchar ch) {
+      return vowels.map!"a[0]".canFind(ch);
+    }
+
+    bool endsWithShortSylable(string data) {
+      return false;
     }
 
     string[] replaceVowels(const string value) pure {
@@ -426,13 +445,23 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
     }
 
     string region1(string word) pure {
-      if(word.length < 4) {
+      if(word.length < 2) {
         return "";
       }
 
-      foreach(i; 1..word.length - 1) {
-        if(nonVowels.canFind(word[i..i+1]) && vowels.canFind(word[i+1..i+2])) {
-          return word[i+1..$];
+      import std.stdio;
+      debug writeln("r1 ===>", word);
+      static foreach(prefix; [ "gener", "commun", "arsen"]) {
+        if(word.startsWith("prefix")) {
+          return word[prefix.length .. $];
+        }
+      }
+
+      debug writeln("r11 ===>", word);
+
+      foreach(i; 0..word.length - 1) {
+        if(vowels.map!"a[0]".canFind(word[i]) && nonVowels.map!"a[0]".canFind(word[i+1])) {
+          return word[i+2..$];
         }
       }
 
@@ -440,6 +469,8 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
     }
 
     string region2(string word) pure {
+      import std.stdio;
+      debug writeln("r2 ===>", word);
       return region1(region1(word));
     }
 }
@@ -490,6 +521,58 @@ immutable class EnglishRule1b : IStemOperation {
   }
 }
 
+immutable class EnglishRule5 : IStemOperation {
+  static immutable(IStemOperation) opCall() pure {
+    return new immutable EnglishRule5();
+  }
+
+  string get(const string value) pure {
+    auto r1 = EnglishAlphabet.region1(value);
+    auto r2 = EnglishAlphabet.region1(r1);
+
+    if(r2.canFind('e')) {
+      return value[0..$-r2.length] ~ r2.replace("e", "");
+    }
+
+    auto prefix = value[0..$-r1.length];
+    if(r1.canFind('e') && EnglishAlphabet.endsWithShortSylable(prefix)) {
+      return prefix ~ r1.replace("e", "");
+    }
+
+    return "";
+  }
+}
+
+immutable class RemoveEnglishPlural : IStemOperation {
+  static immutable(IStemOperation) opCall() pure {
+    return new immutable RemoveEnglishPlural();
+  }
+
+  string get(const string value) pure {
+    string result = "";
+
+    if(value.length <= 2) {
+      return "";
+    }
+
+    if(!value.endsWith('s')) {
+      return "";
+    }
+
+    auto format = value.map!(a => EnglishAlphabet.isVowel(a));
+
+    if(format.endsWith([true, false])) {
+      return "";
+    }
+
+    if(format.canFind([true, false])) {
+      return value[0..$-1];
+    }
+
+    return result;
+  }
+}
+
 alias EnglishAlphabet = Alphabet!(["a", "e", "i", "o", "u", "y"]);
 
 class EnStemmer {
@@ -521,8 +604,7 @@ class EnStemmer {
                 InlineReplace([["sses", "ss"]]),
                 InlineReplace(EnglishAlphabet.get!"**i"("**ied") ~ EnglishAlphabet.get!"**i"("**ies")),
                 ReplacePostfix([["ies", "ie"]]),
-                ReplacePostfix(EnglishAlphabet.get!"**"("V*s")),
-                ReplacePostfix(EnglishAlphabet.get!"***"("V**s"))
+                RemoveEnglishPlural()
               ]),
               Or([ // step 1b
                 ReplaceAfterFromRegion!EnglishAlphabet(1, [
@@ -554,6 +636,7 @@ class EnStemmer {
                 ["iviti", "ive"],
                 ["biliti", "ble"]
               ]),
+
               ReplaceAfter([
                 ["bli", "ble"],
                 ["logi", "log"],
@@ -605,9 +688,9 @@ class EnStemmer {
                 RemovePostifixFromRegion!EnglishAlphabet(2, "ize"),
                 RemovePostifixFromRegion!EnglishAlphabet(2, "er"),
                 RemovePostifixFromRegion!EnglishAlphabet(2, "ic"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "al"),
+                RemovePostifixFromRegion!EnglishAlphabet(2, "al")
               ]),
-              ReplaceFromRegion!EnglishAlphabet(1, "e", "")
+              EnglishRule5()
         ]]),
       ]
     ])
