@@ -12,7 +12,7 @@
 		"htmld": "0.2.18",
 		"libasync": "0.8.3",
 		"libdominator": "1.1.5",
-		"libdparse": "0.7.2-alpha.4",
+		"libdparse": "0.7.2-alpha.5",
 		"libevent": "2.0.2+2.0.16",
 		"memutils": "0.4.9",
 		"openssl": "1.1.6+1.0.1g",
