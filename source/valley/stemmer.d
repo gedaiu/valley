@@ -449,15 +449,11 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
         return "";
       }
 
-      import std.stdio;
-      debug writeln("r1 ===>", word);
       static foreach(prefix; [ "gener", "commun", "arsen"]) {
         if(word.startsWith("prefix")) {
           return word[prefix.length .. $];
         }
       }
-
-      debug writeln("r11 ===>", word);
 
       foreach(i; 0..word.length - 1) {
         if(vowels.map!"a[0]".canFind(word[i]) && nonVowels.map!"a[0]".canFind(word[i+1])) {
