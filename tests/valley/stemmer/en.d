@@ -98,7 +98,11 @@ private alias suite = Spec!({
       ["by", "by"],
       ["say", "say"],
       ["ties", "tie"],
-      ["cry", "cri"]
+      ["cry", "cri"],
+      ["gas", "gas"],
+      ["this", "this"],
+      ["kiwis", "kiwi"],
+      ["gaps", "gap"]
     ];
 
     static foreach(words; stems) {

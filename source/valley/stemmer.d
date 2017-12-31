@@ -209,20 +209,14 @@ immutable class Or : IStemOperation {
   }
 
   string get(const string value) pure {
-    import std.stdio;
-    debug writeln("OR ", value);
-
     foreach(andList; list) {
       auto result = And(andList).get(value);
 
       if(result != "") {
-        debug writeln("OR Result", result);
         return result;
       }
     }
 
-
-    debug writeln("OR Done");
     return "";
   }
 }
@@ -269,9 +263,6 @@ immutable class RemovePostifixFromRegion(T) : StemOperationFromRegion!T {
   string get(const string value) pure {
     string strRegion = getRegion(value);
 
-    import std.stdio;
-    debug writeln("strRegion: ", T.region1(value), " ", T.region2(value), " ", value, " ", postfix, " ", strRegion.endsWith(postfix));
-
     if(strRegion.endsWith(postfix)) {
       return value[0..$ - strRegion.length] ~ strRegion[0..$ - postfix.length];
     }
@@ -298,10 +289,8 @@ immutable class ReplaceFromRegion(T) : StemOperationFromRegion!T {
   }
 
   string get(const string value) pure {
-    import std.stdio;
-    debug writeln("GET: ", value);
     string strRegion = getRegion(value);
-    debug writeln("Replace from region: ", strRegion, " ", from, " ", to);
+
     return value[0..$ - strRegion.length] ~ strRegion.replace(from, to);
   }
 }
@@ -465,8 +454,6 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
     }
 
     string region2(string word) pure {
-      import std.stdio;
-      debug writeln("r2 ===>", word);
       return region1(region1(word));
     }
 }
@@ -545,8 +532,6 @@ immutable class RemoveEnglishPlural : IStemOperation {
   }
 
   string get(const string value) pure {
-    string result = "";
-
     if(value.length <= 2) {
       return "";
     }
@@ -555,17 +540,13 @@ immutable class RemoveEnglishPlural : IStemOperation {
       return "";
     }
 
-    auto format = value.map!(a => EnglishAlphabet.isVowel(a));
+    auto format = value.map!(a => EnglishAlphabet.isVowel(a)).array;
 
-    if(format.endsWith([true, false])) {
-      return "";
-    }
-
-    if(format.canFind([true, false])) {
+    if(format[0..$-1].canFind([true, false]) || format[0..$-2].canFind([false, true])) {
       return value[0..$-1];
     }
 
-    return result;
+    return "";
   }
 }
 
@@ -630,7 +611,8 @@ class EnStemmer {
                 ["ousness", "ous"],
                 ["iveness", "ive"],
                 ["iviti", "ive"],
-                ["biliti", "ble"]
+                ["biliti", "ble"],
+                ["ou", ""]
               ]),
 
               ReplaceAfter([
@@ -638,16 +620,16 @@ class EnStemmer {
                 ["logi", "log"],
                 ["fulli", "ful"],
                 ["lessli", "less"],
-                ["cli", ""],
-                ["dli", ""],
-                ["eli", ""],
-                ["gli", ""],
-                ["hli", ""],
-                ["kli", ""],
-                ["mli", ""],
-                ["nli", ""],
-                ["rli", ""],
-                ["tli", ""]
+                ["cli", "c"],
+                ["dli", "d"],
+                ["eli", "e"],
+                ["gli", "g"],
+                ["hli", "h"],
+                ["kli", "k"],
+                ["mli", "m"],
+                ["nli", "n"],
+                ["rli", "r"],
+                ["tli", "t"]
               ]),
 
               Or([
