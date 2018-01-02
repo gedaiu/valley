@@ -20,6 +20,7 @@ import std.string;
 import vibe.core.core;
 import vibe.http.client;
 import vibe.stream.operations;
+import valley.stemmer;
 
 import valley.crawler;
 import valley.uri;
@@ -33,6 +34,8 @@ HTTPClientSettings httpSettings;
 void crawlerResult(scope CrawlPage crawlPage) {
   auto document = new HTMLDocument(crawlPage.uri, crawlPage.content);
 
+  auto stem = new EnStemmer;
+
   auto page = PageData(
     document.title,
     crawlPage.uri,
@@ -41,7 +44,11 @@ void crawlerResult(scope CrawlPage crawlPage) {
 
     document.links.map!(a => URI(a)).array,
     [],
-    document.plainText.split(" ").map!(a => a.strip).filter!(a => a.length > 4).array,
+    document.plainText
+      .split(" ")
+      .map!(a => a.strip.toLower)
+      .map!(a => stem.get(a))
+      .filter!(a => a.length > 4).array,
     InformationType.webPage
   );
 

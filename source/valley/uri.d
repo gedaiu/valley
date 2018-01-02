@@ -191,7 +191,7 @@ struct Path {
         return pieces[0];
       }
 
-      return pieces[0..1].chain(pieces[1..$].filter!`a.length > 0`).join("/");
+      return pieces[0..1].chain(pieces[1..$]).join("/");
     }
 
     auto length() {
@@ -288,6 +288,11 @@ struct URI {
       tmpUri = tmpUri[pos + 2..$];
 
       pos = tmpUri.indexOf("/");
+
+      if(pos == -1) {
+        pos = tmpUri.indexOf("?");
+      }
+
       if(pos == -1) {
         pos = tmpUri.length;
       }
@@ -467,4 +472,28 @@ unittest {
   auto uri = URI("http://example.com/path?query");
 
   (uri.path ~ uri.query).toString.should.equal("/path?query");
+}
+
+/// Parse an url with root path and query
+unittest {
+  auto uri = URI("http://example.com/?query");
+
+  (uri.path ~ uri.query).toString.should.equal("/?query");
+}
+
+
+/// Parse an url with trailing paths and query
+unittest {
+  auto uri = URI("http://example.com/path/?query");
+
+  (uri.path ~ uri.query).toString.should.equal("/path/?query");
+}
+
+
+/// Get the domain from an url without path
+unittest {
+  auto uri = URI("https://www.demo.com?ref=val");
+
+  uri.authority.host.should.equal("www.demo.com");
+  uri.query.value.should.equal("ref=val");
 }
