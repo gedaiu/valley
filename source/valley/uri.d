@@ -60,7 +60,7 @@ unittest {
   uri.path.value.should.equal("/path/");
   uri.query.value.should.equal("query");
   uri.fragment.should.equal("hashtag");
-  uri.toString.should.equal("https://google.com/path?query#hashtag");
+  uri.toString.should.equal("https://google.com/path/?query#hashtag");
 }
 
 struct Authority {
@@ -184,14 +184,19 @@ struct Path {
       auto pieces = value.split("/").filter!`a != "."`.array;
 
       if(pieces.length == 0) {
-        return "";
+        return value;
       }
 
       if(pieces.length == 1) {
-        return pieces[0];
+        return value;
       }
 
-      return pieces[0..1].chain(pieces[1..$]).join("/");
+      string result = pieces.join("/");
+      while(result.indexOf("//") != -1) {
+        result = result.replace("//", "/");
+      }
+
+      return result;
     }
 
     auto length() {
@@ -228,6 +233,7 @@ Path path(const string value) pure {
 /// Path absolute
 unittest {
   Path("").isAbsolute.should.equal(false);
+  Path("/").isAbsolute.should.equal(true);
   Path("document.html").isAbsolute.should.equal(false);
   Path("/document.html").isAbsolute.should.equal(true);
 }
@@ -238,17 +244,20 @@ unittest {
   (Path("/path") ~ Path("other")).toString.should.equal("/path/other");
   (Path("/path/") ~ Path("other")).toString.should.equal("/path/other");
   (Path("/path/") ~ Path("./other")).toString.should.equal("/path/other");
-  (Path("/path/") ~ Path("other//")).toString.should.equal("/path/other");
-  (Path("/path/") ~ Path("../other/")).toString.should.equal("/path/../other");
+  (Path("/path/") ~ Path("other//")).toString.should.equal("/path/other/");
+  (Path("/path/") ~ Path("../other/")).toString.should.equal("/path/../other/");
+  (Path("/") ~ Path("")).toString.should.equal("/");
+  (Path("/") ~ Path("/")).toString.should.equal("/");
 }
 
 /// Normalize paths
 unittest {
-  Path("/path/../other/").toNormalizedString.should.equal("/other");
-  Path("/path/../../other/").toNormalizedString.should.equal("other");
-  Path("/path/../../../other/").toNormalizedString.should.equal("other");
+  Path("/path/../other/").toNormalizedString.should.equal("/other/");
+  Path("/path/../../other/").toNormalizedString.should.equal("other/");
+  Path("/path/../../../other/").toNormalizedString.should.equal("other/");
   Path("path").toNormalizedString.should.equal("path");
   Path("").toNormalizedString.should.equal("");
+  Path("/").toNormalizedString.should.equal("/");
 }
 
 struct Query {

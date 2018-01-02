@@ -28,7 +28,7 @@ private alias suite = Spec!({
         Badge[] badges = [ Badge(BadgeType.approve, [1, 2, 3]) ];
         auto data = PageData(
           "some title",
-          URI("http://example.com/"),
+          URI("http://example.com"),
           "some description",
           Clock.currTime,
 
@@ -142,7 +142,7 @@ private alias suite = Spec!({
         beforeEach({
           auto data = PageData(
             "some title",
-            URI("http://example.com/"),
+            URI("http://example.com"),
             "some description",
             Clock.currTime,
             [],
@@ -172,7 +172,7 @@ private alias suite = Spec!({
           Badge[] badges = [ Badge(BadgeType.approve, [1, 2, 3]) ];
           auto data = PageData(
             "some other title",
-            URI("http://example.com/"),
+            URI("http://example.com"),
             "some other description",
             Clock.currTime,
 
@@ -226,7 +226,7 @@ private alias suite = Spec!({
           Badge[] badges = [ Badge(BadgeType.authenticity, [1, 2, 3]) ];
           auto data = PageData(
             "some other title",
-            URI("http://example.com/"),
+            URI("http://example.com"),
             "some other description",
             Clock.currTime,
 
@@ -306,7 +306,7 @@ private alias suite = Spec!({
 
       describe("and removed", {
         beforeEach({
-          storage.remove(URI("http://example.com/"));
+          storage.remove(URI("http://example.com"));
         });
 
         it("should remove the page", {
