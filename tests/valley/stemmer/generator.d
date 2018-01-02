@@ -51,6 +51,11 @@ private alias suite = Spec!({
         EnglishAlphabet.region2("beauty").should.equal("");
       });
 
+      it("should get the regions for 'congener'", {
+        EnglishAlphabet.region1("congener").should.equal("gener");
+        EnglishAlphabet.region2("congener").should.equal("er");
+      });
+
       it("should get the regions for 'beau'", {
         EnglishAlphabet.region1("beau").should.equal("");
         EnglishAlphabet.region2("beau").should.equal("");
@@ -69,6 +74,75 @@ private alias suite = Spec!({
       it("should get the regions for 'eucharist'", {
         EnglishAlphabet.region1("eucharist").should.equal("arist");
         EnglishAlphabet.region2("eucharist").should.equal("ist");
+      });
+
+      it("should detect the end short syllable for 'rap'", {
+        EnglishAlphabet.endsWithShortSylable("rap").should.equal(true);
+      });
+
+      it("should detect the end short syllable for 'trap'", {
+        EnglishAlphabet.endsWithShortSylable("trap").should.equal(true);
+      });
+
+
+      it("should detect the end short syllable for 'vi'", {
+        EnglishAlphabet.endsWithShortSylable("vi").should.equal(true);
+      });
+
+      it("should detect the end short syllable for 'entrap'", {
+        EnglishAlphabet.endsWithShortSylable("entrap").should.equal(true);
+      });
+
+      it("should detect the end short syllable for 'ow'", {
+        EnglishAlphabet.endsWithShortSylable("ow").should.equal(true);
+      });
+
+      it("should detect the end short syllable for 'on'", {
+        EnglishAlphabet.endsWithShortSylable("on").should.equal(true);
+      });
+
+      it("should detect the end short syllable for 'at'", {
+        EnglishAlphabet.endsWithShortSylable("at").should.equal(true);
+      });
+
+      it("should not detect the end short syllable for 'uproot'", {
+        EnglishAlphabet.endsWithShortSylable("uproot").should.equal(false);
+      });
+
+      it("should not detect the end short syllable for 'bestow'", {
+        EnglishAlphabet.endsWithShortSylable("bestow").should.equal(false);
+      });
+
+      it("should not detect the end short syllable for 'disturb'", {
+        EnglishAlphabet.endsWithShortSylable("disturb").should.equal(false);
+      });
+
+      it("should detect the 'bed' as short word", {
+        EnglishAlphabet.isShortWord("bed").should.equal(true);
+      });
+
+      it("should detect the 'shed' as short word", {
+        EnglishAlphabet.isShortWord("shed").should.equal(true);
+      });
+
+      it("should detect the 'shred' as short word", {
+        EnglishAlphabet.isShortWord("shred").should.equal(true);
+      });
+
+      it("should detect the 'hop' as short word", {
+        EnglishAlphabet.isShortWord("hop").should.equal(true);
+      });
+
+      it("should detect the 'bead' as short word", {
+        EnglishAlphabet.isShortWord("bead").should.equal(false);
+      });
+
+      it("should detect the 'embed' as short word", {
+        EnglishAlphabet.isShortWord("embed").should.equal(false);
+      });
+
+      it("should detect the 'beds' as short word", {
+        EnglishAlphabet.isShortWord("beds").should.equal(false);
       });
     });
   });

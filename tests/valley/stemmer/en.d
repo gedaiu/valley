@@ -8,6 +8,11 @@ import valley.stemmer;
 import std.file;
 import std.conv;
 import std.datetime;
+import std.file;
+import std.string;
+import std.conv;
+
+import trial.step;
 
 private alias suite = Spec!({
   describe("english stemmer", {
@@ -102,7 +107,45 @@ private alias suite = Spec!({
       ["gas", "gas"],
       ["this", "this"],
       ["kiwis", "kiwi"],
-      ["gaps", "gap"]
+      ["gaps", "gap"],
+      ["abdomen", "abdomen"],
+      ["abeyance", "abey"],
+      ["abed", "abe"],
+      ["abe", "abe"],
+      ["abilities", "abil"],
+      ["added", "ad"],
+      ["adulatory", "adulatori"],
+      ["advance", "advanc"],
+      ["aeschylus", "aeschylus"],
+      ["agreement", "agreement"],
+      ["zone", "zone"],
+      ["accrue", "accru"],
+      ["aided", "aid"],
+      ["zample", "zampl"],
+      ["yore", "yore"],
+      ["wring", "wring"],
+      ["wooed", "woo"],
+      ["wooded", "wood"],
+      ["wofully", "wofulli"],
+      ["zoology", "zoolog"],
+      ["yearly", "year"],
+      ["wiolinceller", "wiolincel"],
+      ["where", "where"],
+      ["wexed", "wex"],
+      ["weed", "weed"],
+      ["vied", "vie"],
+      ["die", "die"],
+      ["assessor", "assessor"],
+      ["awe", "awe"],
+      ["being", "be"],
+      ["canning", "canning"],
+      ["commune", "commune"],
+      ["congeners", "congen"],
+      ["conversational", "convers"],
+      ["eas", "ea"],
+      ["fluently", "fluentli"],
+      ["ied", "ie"],
+      ["kinkajou", "kinkajou"]
     ];
 
     static foreach(words; stems) {
@@ -111,5 +154,31 @@ private alias suite = Spec!({
         stem.get(words[0]).should.equal(words[1]);
       });
     }
+
+    it("should process the words according the example files", {
+      auto source = readText("testData/stemmer/english/voc.txt").split("\n");
+      auto output = readText("testData/stemmer/english/output.txt").split("\n");
+
+      auto stem = new EnStemmer;
+
+      Exception lastException;
+      int errors;
+
+      foreach(size_t i, value; source) {
+        Step(i.to!string ~ " " ~ value);
+
+        try {
+          stem.get(value).should.equal(output[i]);
+        } catch(Exception e) {
+          lastException = e;
+          errors++;
+        }
+      }
+
+      Step(errors.to!string ~ " bad results");
+      if(lastException !is null) {
+        throw lastException;
+      }
+    });
   });
 });

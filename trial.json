@@ -1,6 +1,6 @@
 {
 	"reporters": [
-		"spec",
+		"spec-steps",
 		"result"
 	],
 	"testDiscovery": [

@@ -69,7 +69,6 @@ immutable class ReplaceAfter : IStemOperation {
   }
 
   string get(const string value) pure {
-
     foreach(pair; list) {
       auto pos = value.indexOf(pair[0]);
 
@@ -111,7 +110,6 @@ immutable class ReplacePostfix : IStemOperation {
   }
 }
 
-
 immutable class InlineReplace : IStemOperation {
 
   immutable(string[2][]) list;
@@ -126,6 +124,10 @@ immutable class InlineReplace : IStemOperation {
 
   static immutable(IStemOperation) opCall(immutable(string[2][]) list) pure {
     return new immutable InlineReplace(list);
+  }
+
+  static immutable(IStemOperation) opCall(immutable(string) from, immutable(string) to) pure {
+    return new immutable InlineReplace([[from, to]]);
   }
 
   string get(const string value) pure {
@@ -248,23 +250,69 @@ immutable abstract class StemOperationFromRegion(T) : IStemOperation {
 }
 
 immutable class RemovePostifixFromRegion(T) : StemOperationFromRegion!T {
-  string postfix;
+  string[] list;
 
-  this(size_t region, immutable string postfix) pure {
+  this(size_t region, immutable string[] list) pure {
     super(region);
 
-    this.postfix = postfix;
+    this.list = list;
   }
 
   static immutable(IStemOperation) opCall(size_t region, immutable string postfix) pure {
-    return new immutable RemovePostifixFromRegion!T(region, postfix);
+    return new immutable RemovePostifixFromRegion!T(region, [ postfix ]);
+  }
+
+  static immutable(IStemOperation) opCall(size_t region, immutable string[] list) pure {
+    return new immutable RemovePostifixFromRegion!T(region, list);
   }
 
   string get(const string value) pure {
     string strRegion = getRegion(value);
 
-    if(strRegion.endsWith(postfix)) {
-      return value[0..$ - strRegion.length] ~ strRegion[0..$ - postfix.length];
+    foreach(postfix; list) {
+      if(strRegion.endsWith(postfix)) {
+        return value[0..$ - postfix.length];
+      }
+
+      if(value.endsWith(postfix)) {
+        return "";
+      }
+    }
+
+    return "";
+  }
+}
+
+immutable class ReplacePostifixFromRegion(T) : StemOperationFromRegion!T {
+  immutable {
+    string[][] list;
+  }
+
+  this(size_t region, immutable(string[][]) list) pure {
+    super(region);
+
+    this.list = list;
+  }
+
+  static immutable(IStemOperation) opCall(size_t region, immutable string from, immutable string to) pure {
+    return new immutable ReplacePostifixFromRegion!T(region, [[ from, to ]]);
+  }
+
+  static immutable(IStemOperation) opCall(size_t region, string[][] list) pure {
+    return new immutable ReplacePostifixFromRegion!T(region, list.map!(a => a.idup).array.idup);
+  }
+
+  string get(const string value) pure {
+    string strRegion = getRegion(value);
+
+    foreach(item; list) {
+      if(strRegion.endsWith(item[0])) {
+        return value[0..$ - strRegion.length] ~ strRegion.replaceLast(item[0], item[1]);
+      }
+
+      if(value.endsWith(item[0])) {
+        return "";
+      }
     }
 
     return "";
@@ -273,25 +321,33 @@ immutable class RemovePostifixFromRegion(T) : StemOperationFromRegion!T {
 
 immutable class ReplaceFromRegion(T) : StemOperationFromRegion!T {
   immutable {
-    string from;
-    string to;
+    string[][] list;
   }
 
-  this(size_t region, immutable string from, immutable string to) pure {
+  this(size_t region, immutable(string[][]) list) pure {
     super(region);
 
-    this.from = from;
-    this.to = to;
+    this.list = list;
   }
 
   static immutable(IStemOperation) opCall(size_t region, immutable string from, immutable string to) pure {
-    return new immutable ReplaceFromRegion!T(region, from, to);
+    return new immutable ReplaceFromRegion!T(region, [[ from, to ]]);
+  }
+
+  static immutable(IStemOperation) opCall(size_t region, string[][] list) pure {
+    return new immutable ReplaceFromRegion!T(region, list.map!(a => a.idup).array.idup);
   }
 
   string get(const string value) pure {
     string strRegion = getRegion(value);
 
-    return value[0..$ - strRegion.length] ~ strRegion.replace(from, to);
+    foreach(item; list) {
+      if(strRegion.canFind(item[0])) {
+        return value[0..$ - strRegion.length] ~ strRegion.replaceLast(item[0], item[1]);
+      }
+    }
+
+    return "";
   }
 }
 
@@ -360,7 +416,36 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
       return vowels.map!"a[0]".canFind(ch);
     }
 
-    bool endsWithShortSylable(string data) {
+    bool isShortWord(string data) pure {
+      return EnglishAlphabet.endsWithShortSylable(data) && EnglishAlphabet.region1(data) == "";
+    }
+
+    bool endsWithShortSylable(string data) pure {
+      if(data.length < 2) {
+        return true;
+      }
+
+      auto result = data.map!(a => isVowel(a)).array;
+
+      if(result == [true, false]) {
+        return true;
+      }
+
+      if(result == [false, true] && data[1] == 'i') {
+        return true;
+      }
+
+      if(data.length == 2) {
+        return false;
+      }
+
+      auto lastChar = data[data.length - 1];
+      auto vowelsXWY = vowels.join ~ "wxY";
+
+      if(result.endsWith([false, true, false]) && vowelsXWY.indexOf(lastChar) == -1) {
+        return true;
+      }
+
       return false;
     }
 
@@ -427,20 +512,24 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
           .filter!(a => !a.canFind("*")).array.idup;
     }
 
-    string[2][] get(string replace)(const string value) pure {
+    immutable(string[2][]) get(string replace)(const string value) pure {
       return get(value)
         .map!(a => cast(string[2])[a, change(replace, a)])
           .array;
     }
 
-    string region1(string word) pure {
+    alias region1 = region!true;
+
+    string region(bool useExceptions)(string word) pure {
       if(word.length < 2) {
         return "";
       }
 
-      static foreach(prefix; [ "gener", "commun", "arsen"]) {
-        if(word.startsWith("prefix")) {
-          return word[prefix.length .. $];
+      static if(useExceptions) {
+        static foreach(prefix; [ "gener", "commun", "arsen"]) {
+          if(word.startsWith(prefix)) {
+            return word[prefix.length .. $];
+          }
         }
       }
 
@@ -454,7 +543,7 @@ struct Alphabet(string[] vowels, string[] extraLetters = []) {
     }
 
     string region2(string word) pure {
-      return region1(region1(word));
+      return region!false(region1(word));
     }
 }
 
@@ -464,6 +553,20 @@ immutable class EnglishRule1b : IStemOperation {
   }
 
   string get(const string value) pure {
+    if(value.endsWith("eed") || value.endsWith("eedly")) {
+      auto r1 = EnglishAlphabet.region1(value);
+
+      if(r1.endsWith("eed")){
+        return value[0..$-1];
+      }
+
+      if(r1.endsWith("eedli")){
+        return value[0..$-3];
+      }
+
+      return "";
+    }
+
     auto result = Or([
       RemovePostfix([ "ed", "ing" ]),
       ReplaceAfter([
@@ -476,11 +579,15 @@ immutable class EnglishRule1b : IStemOperation {
       return "";
     }
 
-    if(result.endsWith("at") || result.endsWith("bl") || result.endsWith("iz")) {
-      result ~= "e";
+    if(!result.map!(a => EnglishAlphabet.isVowel(a)).canFind(true)) {
+      return "";
     }
 
-    auto replaceDouble = ReplaceAfter([
+    if(result.endsWith("at") || result.endsWith("bl") || result.endsWith("iz")) {
+      return result ~ "e";
+    }
+
+    auto replaceDouble = ReplacePostfix([
       ["bb", "b"],
       ["dd", "d"],
       ["ff", "f"],
@@ -493,14 +600,34 @@ immutable class EnglishRule1b : IStemOperation {
     ]).get(result);
 
     if(replaceDouble != "") {
-      result = replaceDouble;
+      return replaceDouble;
     }
 
-    if(result.length <= 3) {
+    if(EnglishAlphabet.isShortWord(result)) {
       result ~= "e";
     }
 
     return result;
+  }
+}
+
+immutable class EnglishIonPostfix : IStemOperation {
+  static immutable(IStemOperation) opCall() pure {
+    return new immutable EnglishIonPostfix();
+  }
+
+  string get(const string value) pure {
+    auto r2 = EnglishAlphabet.region2(value);
+
+    if(!r2.endsWith("ion")) {
+      return "";
+    }
+
+    if(value.endsWith("tion") || value.endsWith("sion")) {
+      return value[0..$-3];
+    }
+
+    return "";
   }
 }
 
@@ -513,16 +640,57 @@ immutable class EnglishRule5 : IStemOperation {
     auto r1 = EnglishAlphabet.region1(value);
     auto r2 = EnglishAlphabet.region1(r1);
 
-    if(r2.canFind('e')) {
-      return value[0..$-r2.length] ~ r2.replace("e", "");
+    if(r2.endsWith('l') && value.endsWith("ll")) {
+      return value[0..$-1];
     }
 
-    auto prefix = value[0..$-r1.length];
-    if(r1.canFind('e') && EnglishAlphabet.endsWithShortSylable(prefix)) {
-      return prefix ~ r1.replace("e", "");
+    if(r2.endsWith('e')) {
+      return value[0..$-1];
+    }
+
+    if(r1.endsWith('e')) {
+      string beforeE = value[0..value.lastIndexOf('e')];
+
+      if(!EnglishAlphabet.endsWithShortSylable(beforeE)) {
+        return value[0..$-1];
+      }
     }
 
     return "";
+  }
+}
+
+immutable class ReplaceEnglishLiEnding : IStemOperation {
+  static immutable(IStemOperation) opCall() pure {
+    return new immutable ReplaceEnglishLiEnding();
+  }
+
+  string get(const string value) pure {
+    if(value.length <= 2) {
+      return "";
+    }
+
+    if(value.endsWith("ousli") ||
+       value.endsWith("abli") ||
+       value.endsWith("lessli") ||
+       value.endsWith("alli") ||
+       value.endsWith("fulli") ||
+       value.endsWith("bli") ||
+       value.endsWith("entli") ) {
+         return "";
+    }
+
+    auto r1 = EnglishAlphabet.region1(value);
+
+    if(!r1.endsWith("li")) {
+      return "";
+    }
+
+    if("cdeghkmnrt".indexOf(value[value.length - 3]) == -1) {
+      return "";
+    }
+
+    return value[0..$-2];
   }
 }
 
@@ -540,9 +708,17 @@ immutable class RemoveEnglishPlural : IStemOperation {
       return "";
     }
 
+    if(value.endsWith("ss")) {
+      return "";
+    }
+
+    if(value.endsWith("us")) {
+      return "";
+    }
+
     auto format = value.map!(a => EnglishAlphabet.isVowel(a)).array;
 
-    if(format[0..$-1].canFind([true, false]) || format[0..$-2].canFind([false, true])) {
+    if(format[0..$-2].canFind(true)) {
       return value[0..$-1];
     }
 
@@ -550,16 +726,19 @@ immutable class RemoveEnglishPlural : IStemOperation {
   }
 }
 
-alias EnglishAlphabet = Alphabet!(["a", "e", "i", "o", "u", "y"]);
+alias EnglishAlphabet = Alphabet!(["a", "e", "i", "o", "u", "y"], [ "Y" ]);
 
 class EnStemmer {
   static immutable operations = [
     Or([
       [ Invariant(["sky", "news", "howe", "atlas", "cosmos", "bias", "andes"]) ], // exception 1 or
       [
+        InlineReplace(EnglishAlphabet.get!"*Y"("Vy")),
         InlineReplace([ // step 0
-          ["'s'", ""],
+          ["'s'", "s"],
           ["'s", ""],
+          ["'''", "'"],
+          ["''", "'"],
           ["'", ""]
         ]),
         Or([[
@@ -578,104 +757,90 @@ class EnStemmer {
               ])
             ],[
               Or([ // step 1a
-                InlineReplace([["sses", "ss"]]),
-                InlineReplace(EnglishAlphabet.get!"**i"("**ied") ~ EnglishAlphabet.get!"**i"("**ies")),
+                ReplacePostfix([["sses", "ss"]]),
+                ReplacePostfix(EnglishAlphabet.get!"**i"("**ied") ~ EnglishAlphabet.get!"**i"("**ies")),
                 ReplacePostfix([["ies", "ie"]]),
                 RemoveEnglishPlural()
               ]),
-              Or([ // step 1b
-                ReplaceAfterFromRegion!EnglishAlphabet(1, [
-                  ["eed", "ee" ],
-                  ["eedly", "ee" ]
-                ]),
-                EnglishRule1b()
-              ]),
-              ReplacePostfix(EnglishAlphabet.get!"*i"("Ny"), 2),
+              Or([[
+                Invariant([ "inning", "outing", "canning", "herring", "earring", "proceed", "exceed", "succeed"])
+              ], [
+                EnglishRule1b(),
+                ReplacePostfix(EnglishAlphabet.get!"*i"("Ny"), 2), // step 1c
 
-              ReplacePostfix([
-                ["tional", "tion"],
-                ["enci", "ence"],
-                ["anci", "ance"],
-                ["abli", "able"],
-                ["entli", "ent"],
-                ["izer", "ize"],
-                ["ization", "ize"],
-                ["ational", "ate"],
-                ["ation", "ate"],
-                ["ator", "ate"],
-                ["alism", "al"],
-                ["aliti", "al"],
-                ["alli", "al"],
-                ["fulness", "ful"],
-                ["ousli", "ous"],
-                ["ousness", "ous"],
-                ["iveness", "ive"],
-                ["iviti", "ive"],
-                ["biliti", "ble"],
-                ["ou", ""]
-              ]),
-
-              ReplaceAfter([
-                ["bli", "ble"],
-                ["logi", "log"],
-                ["fulli", "ful"],
-                ["lessli", "less"],
-                ["cli", "c"],
-                ["dli", "d"],
-                ["eli", "e"],
-                ["gli", "g"],
-                ["hli", "h"],
-                ["kli", "k"],
-                ["mli", "m"],
-                ["nli", "n"],
-                ["rli", "r"],
-                ["tli", "t"]
-              ]),
-
-              Or([
-                ReplacePostfix([
-                  ["alize", "al"],
-                  ["icate", "ic"],
-                  ["iciti", "ic"],
-                  ["ical", "ic"],
-                  ["ful", ""],
-                  ["ness", ""]
+                Or([ // Step 2
+                  ReplacePostifixFromRegion!EnglishAlphabet(1, [
+                    ["ization", "ize"],
+                    ["ational", "ate"],
+                    ["fulness", "ful"],
+                    ["ousness", "ous"],
+                    ["iveness", "ive"],
+                    ["tional", "tion"],
+                    ["lessli", "less"],
+                    ["biliti", "ble"],
+                    ["iviti", "ive"],
+                    ["ousli", "ous"],
+                    ["entli", "ent"],
+                    ["ation", "ate"],
+                    ["fulli", "ful"],
+                    ["aliti", "al"],
+                    ["alism", "al"],
+                    ["enci", "ence"],
+                    ["anci", "ance"],
+                    ["abli", "able"],
+                    ["izer", "ize"],
+                    ["ator", "ate"],
+                    ["alli", "al"],
+                    ["ogi", "og"],
+                    ["logi", "log"],
+                    ["bli", "ble"]
+                  ]),
+                  ReplaceEnglishLiEnding()
                 ]),
 
-                ReplaceAfter([
-                  ["tional", "tion"],
-                  ["ational", "ate"]
+                Or([// Step 3
+                  ReplacePostifixFromRegion!EnglishAlphabet(1, [
+                    ["ational", "ate"],
+                    ["tional", "tion"],
+                    ["alize", "al"],
+                    ["icate", "ic"],
+                    ["iciti", "ic"],
+                    ["ical", "ic"],
+                    ["ness", ""],
+                    ["ful", ""],
+                  ]),
+                  ReplacePostifixFromRegion!EnglishAlphabet(2, "ative", "")
                 ]),
-                ReplaceFromRegion!EnglishAlphabet(2, "ative", ""),
-              ]),
 
-              Or([
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ement"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ance"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ence"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "able"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ible"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ment"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ant"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ent"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ism"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ate"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "iti"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ous"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ive"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ize"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "er"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "ic"),
-                RemovePostifixFromRegion!EnglishAlphabet(2, "al")
-              ]),
-              EnglishRule5()
+                Or([ // Step 4
+                  RemovePostifixFromRegion!EnglishAlphabet(2,
+                    ["ement",
+                    "ance", "ence", "able", "ible", "ment",
+                    "ant" , "ent", "ism", "ate", "iti", "ous", "ive", "ize",
+                    "er", "ic", "al"]),
+                  EnglishIonPostfix()
+                ]),
+                EnglishRule5(),
+                InlineReplace([["Y", "y"]]),
+              ]])
         ]]),
       ]
     ])
   ];
 
   string get(const string value) pure {
-    auto result = And(operations).get(value);
+    if(value.length < 3) {
+      return value;
+    }
+
+    string tmpValue;
+    if(value[0] == 'y') {
+      tmpValue = "Y" ~ value[1..$];
+    } else {
+      tmpValue = value;
+    }
+
+    auto result = And(operations).get(tmpValue);
 
     if(result == "") {
       return value;
