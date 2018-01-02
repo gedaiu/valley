@@ -67,12 +67,12 @@ private alias suite = Spec!({
       });
 
       it("should get the regions for 'sprinkled'", {
-        EnglishAlphabet.region1("sprinkled").should.equal("inkled");
-        EnglishAlphabet.region2("sprinkled").should.equal("ed");
+        EnglishAlphabet.region1("sprinkled").should.equal("kled");
+        EnglishAlphabet.region2("sprinkled").should.equal("");
       });
 
       it("should get the regions for 'eucharist'", {
-        EnglishAlphabet.region1("eucharist").should.equal("arist");
+        EnglishAlphabet.region1("eucharist").should.equal("harist");
         EnglishAlphabet.region2("eucharist").should.equal("ist");
       });
 
