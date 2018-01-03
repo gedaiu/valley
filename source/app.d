@@ -27,6 +27,7 @@ import valley.htmlParser;
 import valley.storage.base;
 import valley.storage.sqlite;
 import valley.stemmer.english;
+import valley.stemmer.cleaner;
 
 Storage storage;
 HTTPClientSettings httpSettings;
@@ -44,7 +45,7 @@ void crawlerResult(scope CrawlPage crawlPage) {
 
     document.links.map!(a => URI(a)).array,
     [],
-    document.plainText
+    document.plainText.clean
       .split(" ")
       .map!(a => a.strip.toLower)
       .map!(a => stem.get(a))
@@ -111,7 +112,7 @@ int main() {
     if(seed.length == 0) {
       writeln("There are no expired pages. Using the default seed.");
       crawler.add(URI("http://dlang.org"));
-      crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
+      //crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
       crawler.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
       return;
     }
