@@ -3,7 +3,8 @@ module tests.valley.stemmer.generator.d;
 import fluent.asserts;
 import trial.discovery.spec;
 
-import valley.stemmer;
+import valley.stemmer.english;
+import valley.stemmer.stemmer;
 
 import std.file;
 import std.conv;

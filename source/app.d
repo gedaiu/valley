@@ -20,13 +20,13 @@ import std.string;
 import vibe.core.core;
 import vibe.http.client;
 import vibe.stream.operations;
-import valley.stemmer;
 
 import valley.crawler;
 import valley.uri;
 import valley.htmlParser;
 import valley.storage.base;
 import valley.storage.sqlite;
+import valley.stemmer.english;
 
 Storage storage;
 HTTPClientSettings httpSettings;

@@ -3,7 +3,7 @@ module tests.valley.stemmer.en;
 import fluent.asserts;
 import trial.discovery.spec;
 
-import valley.stemmer;
+import valley.stemmer.english;
 
 import std.file;
 import std.conv;
