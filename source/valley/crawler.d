@@ -176,7 +176,15 @@ class Crawler
 
     if(page.statusCode > 300 && page.statusCode < 400) {
       if("Location" in page.headers) {
-        add(URI(page.headers["Location"]));
+        URI uri = URI(page.headers["Location"]);
+
+        auto scheme = uri.scheme.value == "" ? page.uri.scheme : uri.scheme;
+        auto authority = uri.authority.toString == "" ? page.uri.authority : uri.authority;
+        auto path = uri.path;
+        auto query = uri.query;
+        auto fragment = uri.fragment;
+
+        add(URI(scheme, authority, path, query, fragment));
       }
 
       return;
@@ -299,7 +307,7 @@ unittest
 }
 
 
-/// It should follow the redirects
+/// It should follow the redirects to absolute locations
 unittest
 {
   auto crawler = new Crawler("", 0.seconds);
@@ -310,7 +318,7 @@ unittest
     string[string] headers;
 
     if(uri.toString == "http://something.com") {
-      headers["Location"] = "https://something.com/";
+      headers["Location"] = "https://other.com/";
       callback(CrawlPage(uri, 301, headers, ""));
       return;
     }
@@ -328,9 +336,73 @@ unittest
   crawler.next();
   crawler.next();
 
-  fetchedUris.should.contain([ "https://something.com/" ]);
+  fetchedUris.should.contain([ "https://other.com/" ]);
 }
 
+/// It should follow the redirects to relative locations
+unittest
+{
+  auto crawler = new Crawler("", 0.seconds);
+  string[] fetchedUris;
+
+  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
+  {
+    string[string] headers;
+
+    if(uri.toString == "http://something.com") {
+      headers["Location"] = "/index.html";
+      callback(CrawlPage(uri, 301, headers, ""));
+      return;
+    }
+
+    callback(CrawlPage(uri, 200, headers, ""));
+  }
+
+  void pageResult(scope CrawlPage page) {
+    fetchedUris ~= page.uri.toString;
+  }
+
+  crawler.onRequest(&requestHandler);
+  crawler.onResult(&pageResult);
+  crawler.add(URI("http://something.com"));
+  crawler.next();
+  crawler.next();
+
+  fetchedUris.should.contain([ "http://something.com/index.html" ]);
+}
+
+
+/// It should follow the redirects to absolute locations without scheme
+unittest
+{
+  auto crawler = new Crawler("", 0.seconds);
+  string[] fetchedUris;
+
+  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
+  {
+    string[string] headers;
+
+    if(uri.toString == "http://something.com") {
+      headers["Location"] = "//something.com/";
+      callback(CrawlPage(uri, 301, headers, ""));
+      return;
+    }
+
+    callback(CrawlPage(uri, 200, headers, ""));
+  }
+
+  void pageResult(scope CrawlPage page) {
+    fetchedUris ~= page.uri.toString;
+  }
+
+  crawler.onRequest(&requestHandler);
+  crawler.onResult(&pageResult);
+  crawler.add(URI("http://something.com"));
+  crawler.next();
+  crawler.next();
+
+  fetchedUris.should.contain([ "http://something.com/" ]);
+}
 
 /// It should query robots once
 unittest
