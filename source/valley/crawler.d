@@ -12,11 +12,6 @@ import std.datetime;
 import std.algorithm;
 import std.exception;
 
-version (unittest)
-{
-  import fluent.asserts;
-}
-
 /// A special uri queue used by the crawler to fetch new pages.
 /// It will fetch an uri once, so if you want to fetch same page multiple
 /// times you need to create a new queue. This queue will also apply the robots.txt
@@ -92,53 +87,6 @@ class UriQueue {
 
     return value;
   }
-}
-
-/// URIQueue should not be empty after an uri is added
-unittest {
-  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
-
-  queue.add(URI("http://example.com/other.html"));
-  queue.empty.should.equal(false);
-
-  queue.pop.toString.should.equal("http://example.com/other.html");
-  queue.empty.should.equal(true);
-}
-
-/// URIQueue should be empty if a processed uri is added
-unittest {
-  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
-  queue.add(URI("http://example.com/index.html"));
-  queue.pop;
-
-  queue.add(URI("http://example.com/index.html"));
-  queue.empty.should.equal(true);
-}
-
-/// URIQueue should throw an exception on poping an empty queue
-unittest {
-  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
-
-  ({
-    queue.pop;
-  }).should.throwAnyException.withMessage.equal("Can not pop an empty queue.");
-}
-
-/// URIQueue should apply robots rules
-unittest {
-  auto queue = new UriQueue(Agent([ "/private/" ]), Authority("example.com"), 0.seconds);
-
-  queue.add(URI("http://example.com/private/page.html"));
-  queue.empty.should.equal(true);
-}
-
-/// URIQueue should throw an exception on adding an uri from a different host
-unittest {
-  auto queue = new UriQueue(Agent(), Authority("example.com"), 0.seconds);
-
-  ({
-    queue.add(URI("http://other.com/index.html"));
-  }).should.throwAnyException.withMessage.equal("Can not add uris from a different host.");
 }
 
 struct CrawlPage {
@@ -240,135 +188,6 @@ class Crawler
   {
     this.callback = callback.toDelegate;
   }
-}
-
-version(unittest) {
-  void nullSinkResult(scope CrawlPage) { }
-  void failureRequest(const URI uri, void delegate(scope CrawlPage) @system callback) { assert(false, "No request should be performed"); }
-}
-
-/// GET the robots.txt on the first request
-unittest
-{
-  auto crawler = new Crawler("", 0.seconds);
-  int index;
-
-  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
-  {
-    scope (exit)
-    {
-      index++;
-    }
-
-    if (index == 0)
-    {
-      uri.toString.should.equal("http://something.com/robots.txt");
-    }
-
-    if (index == 1)
-    {
-      uri.toString.should.equal("http://something.com");
-    }
-
-    string[string] headers;
-    callback(CrawlPage(uri, 200, headers, ""));
-  }
-
-  crawler.onRequest(&requestHandler);
-  crawler.onResult(&nullSinkResult);
-  crawler.add(URI("http://something.com"));
-  crawler.next();
-
-  index.should.equal(2);
-}
-
-/// GET all the added uris
-unittest
-{
-  auto crawler = new Crawler("", 0.seconds);
-  string[] fetchedUris;
-
-  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
-  {
-    fetchedUris ~= uri.toString;
-
-    string[string] headers;
-    callback(CrawlPage(uri, 200, headers, ""));
-  }
-
-  crawler.onRequest(&requestHandler);
-  crawler.onResult(&nullSinkResult);
-  crawler.add(URI("http://something.com"));
-  crawler.add(URI("http://something.com/page.html"));
-  crawler.next();
-  crawler.next();
-
-  fetchedUris.should.contain([ "http://something.com", "http://something.com/page.html" ]);
-}
-
-
-/// It should follow the redirects to absolute locations
-unittest
-{
-  auto crawler = new Crawler("", 0.seconds);
-  string[] fetchedUris;
-
-  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
-  {
-    string[string] headers;
-
-    if(uri.toString == "http://something.com") {
-      headers["Location"] = "https://other.com/";
-      callback(CrawlPage(uri, 301, headers, ""));
-      return;
-    }
-
-    callback(CrawlPage(uri, 200, headers, ""));
-  }
-
-  void pageResult(scope CrawlPage page) {
-    fetchedUris ~= page.uri.toString;
-  }
-
-  crawler.onRequest(&requestHandler);
-  crawler.onResult(&pageResult);
-  crawler.add(URI("http://something.com"));
-  crawler.next();
-  crawler.next();
-
-  fetchedUris.should.contain([ "https://other.com/" ]);
-}
-
-/// It should follow the redirects to relative locations
-unittest
-{
-  auto crawler = new Crawler("", 0.seconds);
-  string[] fetchedUris;
-
-  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
-  {
-    string[string] headers;
-
-    if(uri.toString == "http://something.com") {
-      headers["Location"] = "/index.html";
-      callback(CrawlPage(uri, 301, headers, ""));
-      return;
-    }
-
-    callback(CrawlPage(uri, 200, headers, ""));
-  }
-
-  void pageResult(scope CrawlPage page) {
-    fetchedUris ~= page.uri.toString;
-  }
-
-  crawler.onRequest(&requestHandler);
-  crawler.onResult(&pageResult);
-  crawler.add(URI("http://something.com"));
-  crawler.next();
-  crawler.next();
-
-  fetchedUris.should.contain([ "http://something.com/index.html" ]);
 }
 
 /// Perform an http request

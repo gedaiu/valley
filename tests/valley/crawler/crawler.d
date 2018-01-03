@@ -5,6 +5,7 @@ import trial.discovery.spec;
 
 import valley.crawler;
 import valley.uri;
+import valley.robots;
 
 import std.file;
 import std.conv;
@@ -15,9 +16,124 @@ import std.conv;
 
 import trial.step;
 
+void nullSinkResult(scope CrawlPage) {
+}
+
+void failureRequest(const URI uri, void delegate(scope CrawlPage) @system callback) {
+  assert(false, "No request should be performed");
+}
+
 private alias suite = Spec!({
 
   describe("the crawler", {
+
+    it("should GET the robots.txt on the first request", {
+      auto crawler = new Crawler("", 0.seconds);
+      int index;
+
+      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+        scope (exit) {
+          index++;
+        }
+
+        if (index == 0) {
+          uri.toString.should.equal("http://something.com/robots.txt");
+        }
+
+        if (index == 1) {
+          uri.toString.should.equal("http://something.com");
+        }
+
+        string[string] headers;
+        callback(CrawlPage(uri, 200, headers, ""));
+      }
+
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&nullSinkResult);
+      crawler.add(URI("http://something.com"));
+      crawler.next();
+
+      index.should.equal(2);
+    });
+
+    it("should GET all the added uris", {
+      auto crawler = new Crawler("", 0.seconds);
+      string[] fetchedUris;
+
+      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+        fetchedUris ~= uri.toString;
+
+        string[string] headers;
+        callback(CrawlPage(uri, 200, headers, ""));
+      }
+
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&nullSinkResult);
+      crawler.add(URI("http://something.com"));
+      crawler.add(URI("http://something.com/page.html"));
+      crawler.next();
+      crawler.next();
+
+      fetchedUris.should.contain(["http://something.com", "http://something.com/page.html"]);
+    });
+
+    it("should follow the redirects to absolute locations", {
+      auto crawler = new Crawler("", 0.seconds);
+      string[] fetchedUris;
+
+      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+        string[string] headers;
+
+        if (uri.toString == "http://something.com") {
+          headers["Location"] = "https://other.com/";
+          callback(CrawlPage(uri, 301, headers, ""));
+          return;
+        }
+
+        callback(CrawlPage(uri, 200, headers, ""));
+      }
+
+      void pageResult(scope CrawlPage page) {
+        fetchedUris ~= page.uri.toString;
+      }
+
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&pageResult);
+      crawler.add(URI("http://something.com"));
+      crawler.next();
+      crawler.next();
+
+      fetchedUris.should.contain(["https://other.com/"]);
+    });
+
+    it("should follow the redirects to relative locations", {
+      auto crawler = new Crawler("", 0.seconds);
+      string[] fetchedUris;
+
+      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+        string[string] headers;
+
+        if (uri.toString == "http://something.com") {
+          headers["Location"] = "/index.html";
+          callback(CrawlPage(uri, 301, headers, ""));
+          return;
+        }
+
+        callback(CrawlPage(uri, 200, headers, ""));
+      }
+
+      void pageResult(scope CrawlPage page) {
+        fetchedUris ~= page.uri.toString;
+      }
+
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&pageResult);
+      crawler.add(URI("http://something.com"));
+      crawler.next();
+      crawler.next();
+
+      fetchedUris.should.contain(["http://something.com/index.html"]);
+    });
 
     it("should follow the redirects to absolute locations without scheme", {
       auto crawler = new Crawler("", 0.seconds);
@@ -115,7 +231,6 @@ private alias suite = Spec!({
       while (index < 3);
       (Clock.currTime - begin).should.be.greaterThan(1.seconds);
     });
-
   });
 
   describe("vibe request", {
