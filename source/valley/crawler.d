@@ -171,9 +171,18 @@ class Crawler
 
   private void responseHandler(scope CrawlPage page)
   {
-    this.callback(page);
     queues[page.uri.host].busy = false;
     queues[page.uri.host].lastFetch = Clock.currTime;
+
+    if(page.statusCode > 300 && page.statusCode < 400) {
+      if("Location" in page.headers) {
+        add(URI(page.headers["Location"]));
+      }
+
+      return;
+    }
+
+    this.callback(page);
   }
 
   ///
@@ -287,6 +296,39 @@ unittest
   crawler.next();
 
   fetchedUris.should.contain([ "http://something.com", "http://something.com/page.html" ]);
+}
+
+
+/// It should follow the redirects
+unittest
+{
+  auto crawler = new Crawler("", 0.seconds);
+  string[] fetchedUris;
+
+  void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback)
+  {
+    string[string] headers;
+
+    if(uri.toString == "http://something.com") {
+      headers["Location"] = "https://something.com/";
+      callback(CrawlPage(uri, 301, headers, ""));
+      return;
+    }
+
+    callback(CrawlPage(uri, 200, headers, ""));
+  }
+
+  void pageResult(scope CrawlPage page) {
+    fetchedUris ~= page.uri.toString;
+  }
+
+  crawler.onRequest(&requestHandler);
+  crawler.onResult(&pageResult);
+  crawler.add(URI("http://something.com"));
+  crawler.next();
+  crawler.next();
+
+  fetchedUris.should.contain([ "https://something.com/" ]);
 }
 
 
