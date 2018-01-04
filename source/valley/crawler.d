@@ -89,11 +89,17 @@ class UriQueue {
   }
 }
 
+/// An fetched page
 struct CrawlPage {
   URI uri;
   int statusCode;
   string[string] headers;
   string content;
+}
+
+/// The Crawler settings
+immutable struct CrawlerSettings {
+  string[] domainWhitelist;
 }
 
 ///
@@ -107,14 +113,18 @@ class Crawler
     UriQueue[string] queues;
     URI[][string] pending;
 
-    immutable string agentName;
-    immutable Duration defaultDelay;
+    immutable {
+      string agentName;
+      Duration defaultDelay;
+      CrawlerSettings settings;
+    }
   }
 
   ///
-  this(const string agentName, Duration defaultDelay) {
+  this(const string agentName, Duration defaultDelay, CrawlerSettings settings) {
     this.agentName = agentName.idup;
     this.defaultDelay = defaultDelay;
+    this.settings = settings;
   }
 
   private void responseHandler(scope CrawlPage page)
@@ -144,6 +154,10 @@ class Crawler
   ///
   void add(URI uri)
   {
+    if(!settings.domainWhitelist.canFind(uri.host)) {
+      return;
+    }
+
     if(uri.host in queues) {
       queues[uri.host].add(uri);
       return;

@@ -28,7 +28,7 @@ private alias suite = Spec!({
   describe("the crawler", {
 
     it("should GET the robots.txt on the first request", {
-      auto crawler = new Crawler("", 0.seconds);
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       int index;
 
       void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
@@ -57,7 +57,7 @@ private alias suite = Spec!({
     });
 
     it("should GET all the added uris", {
-      auto crawler = new Crawler("", 0.seconds);
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
       void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
@@ -78,7 +78,7 @@ private alias suite = Spec!({
     });
 
     it("should follow the redirects to absolute locations", {
-      auto crawler = new Crawler("", 0.seconds);
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com", "other.com"]));
       string[] fetchedUris;
 
       void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
@@ -107,7 +107,7 @@ private alias suite = Spec!({
     });
 
     it("should follow the redirects to relative locations", {
-      auto crawler = new Crawler("", 0.seconds);
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
       void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
@@ -136,7 +136,7 @@ private alias suite = Spec!({
     });
 
     it("should follow the redirects to absolute locations without scheme", {
-      auto crawler = new Crawler("", 0.seconds);
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
       void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
@@ -168,7 +168,7 @@ private alias suite = Spec!({
       import std.stdio;
       import vibe.core.core;
 
-      auto crawler = new Crawler("", 0.seconds);
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
       void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
@@ -197,7 +197,7 @@ private alias suite = Spec!({
     });
 
     it("should not get anything if the queues are empty", {
-      auto crawler = new Crawler("", 0.seconds);
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings());
 
       ({
         crawler.onRequest(&failureRequest);
@@ -206,8 +206,8 @@ private alias suite = Spec!({
       }).should.not.throwAnyException;
     });
 
-    it("shoult GET all the added uris applying the crawler delay", {
-      auto crawler = new Crawler("", 1.seconds);
+    it("should GET all the added uris applying the crawler delay", {
+      auto crawler = new Crawler("", 1.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
       int index;
@@ -230,6 +230,28 @@ private alias suite = Spec!({
       }
       while (index < 3);
       (Clock.currTime - begin).should.be.greaterThan(1.seconds);
+    });
+
+    it("should GET pages only from the whitelisted domains", {
+      string[] fetchedUris;
+      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+        fetchedUris ~= uri.toString;
+
+        string[string] headers;
+        callback(CrawlPage(uri, 200, headers, ""));
+      }
+
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings([ "white.com" ]));
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&nullSinkResult);
+
+      crawler.add(URI("http://black.com"));
+      crawler.add(URI("http://white.com"));
+      crawler.next();
+      crawler.next();
+      crawler.next();
+
+      fetchedUris.should.containOnly(["http://white.com/robots.txt", "http://white.com"]);
     });
   });
 

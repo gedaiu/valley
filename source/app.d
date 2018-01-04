@@ -57,8 +57,6 @@ void crawlerResult(scope CrawlPage crawlPage) {
 }
 
 void vibeRequest(const URI uri, void delegate(scope CrawlPage) @system callback) {
-  writeln("GET ", uri.toString);
-
   requestHTTP(uri.toString, (scope req) {  }, (scope HTTPClientResponse res) {
     writeln("GOT ", uri.toString);
     string[string] headers;
@@ -101,18 +99,25 @@ int main() {
 
   storage = new SQLiteStorage("data.db");
 
-  auto crawler = new Crawler("Valley (https://github.com/gedaiu/valley)", 5.seconds);
+  auto crawler = new Crawler(
+    "Valley (https://github.com/gedaiu/valley)",
+    5.seconds,
+    CrawlerSettings([
+      "dlang.org", "forum.dlang.org", "code.dlang.org",
+      "events.ccc.de",
+      "stackoverflow.com" ]
+    ));
 
   crawler.onRequest(&vibeRequest);
   crawler.onResult(&crawlerResult);
 
   runTask({
-    auto seed = storage.pending(0.seconds);
+    auto seed = storage.pending(1.days);
 
     if(seed.length == 0) {
       writeln("There are no expired pages. Using the default seed.");
       crawler.add(URI("http://dlang.org"));
-      //crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
+      crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
       crawler.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
       return;
     }

@@ -209,7 +209,9 @@ struct Path {
           return rhs;
         }
 
-        return value.endsWith('/') ? Path(value ~ rhs.toString) : Path(value ~ "/" ~ rhs.toString);
+        auto tmp = value.endsWith('/') ? Path(value ~ rhs.toString) : Path(value ~ "/" ~ rhs.toString);
+
+        return Path(tmp.toNormalizedString);
       } else {
         static assert(0, "The `" ~ op ~ "` operator is not supported.");
       }
@@ -245,7 +247,7 @@ unittest {
   (Path("/path/") ~ Path("other")).toString.should.equal("/path/other");
   (Path("/path/") ~ Path("./other")).toString.should.equal("/path/other");
   (Path("/path/") ~ Path("other//")).toString.should.equal("/path/other/");
-  (Path("/path/") ~ Path("../other/")).toString.should.equal("/path/../other/");
+  (Path("/path/") ~ Path("../other/")).toString.should.equal("/other/");
   (Path("/") ~ Path("")).toString.should.equal("/");
   (Path("/") ~ Path("/")).toString.should.equal("/");
 }

@@ -113,6 +113,7 @@ string toAbsoluteLink(string link, string base) {
 unittest {
   "documentation.html".toAbsoluteLink("http://example.com").should.equal("http://example.com/documentation.html");
   "/documentation.html".toAbsoluteLink("http://example.com").should.equal("http://example.com/documentation.html");
+  "../documentation.html".toAbsoluteLink("http://example.com/index.html").should.equal("http://example.com/documentation.html");
 
   "documentation.html".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/pages/documentation.html");
   "documentation.html".toAbsoluteLink("http://example.com/pages/?some").should.equal("http://example.com/pages/documentation.html");
