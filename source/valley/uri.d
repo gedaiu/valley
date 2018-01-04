@@ -164,7 +164,7 @@ struct Path {
 
       foreach(piece; cleanPieces) {
         if(piece == "..") {
-          skip++;
+          skip += 2;
           continue;
         }
 
@@ -177,6 +177,11 @@ struct Path {
       }
 
       finalPieces.reverse;
+
+      if(isAbsolute && (finalPieces.length == 0 || finalPieces[0] != "")) {
+        finalPieces = "" ~ finalPieces;
+      }
+
       return finalPieces.join('/');
     }
 
@@ -250,13 +255,15 @@ unittest {
   (Path("/path/") ~ Path("../other/")).toString.should.equal("/other/");
   (Path("/") ~ Path("")).toString.should.equal("/");
   (Path("/") ~ Path("/")).toString.should.equal("/");
+  (Path("/congress/Other.html") ~ Path("../Static.html")).toString.should.equal("/Static.html");
+  (Path("/congress") ~ Path("../Static.html")).toString.should.equal("/Static.html");
 }
 
 /// Normalize paths
 unittest {
   Path("/path/../other/").toNormalizedString.should.equal("/other/");
-  Path("/path/../../other/").toNormalizedString.should.equal("other/");
-  Path("/path/../../../other/").toNormalizedString.should.equal("other/");
+  Path("/path/../../other/").toNormalizedString.should.equal("/other/");
+  Path("/path/../../../other/").toNormalizedString.should.equal("/other/");
   Path("path").toNormalizedString.should.equal("path");
   Path("").toNormalizedString.should.equal("");
   Path("/").toNormalizedString.should.equal("/");
@@ -292,7 +299,11 @@ struct URI {
     auto pos = tmpUri.indexOf("//");
 
     if(pos > 0) {
-      scheme = Scheme(tmpUri[0..pos-1].idup);
+      if(tmpUri[pos - 1] == ':') {
+        scheme = Scheme(tmpUri[0..pos-1].idup);
+      } else {
+        scheme = Scheme(tmpUri[0..pos].idup);
+      }
     }
 
     if(pos != -1) {
@@ -490,6 +501,19 @@ unittest {
   auto uri = URI("http://example.com/?query");
 
   (uri.path ~ uri.query).toString.should.equal("/?query");
+}
+
+/// Parse a path with : and no port
+unittest {
+  auto uri = URI("../Static:MCCL");
+  uri.path.toString.should.equal("../Static:MCCL");
+}
+
+
+/// Parse a url without : after protocol
+unittest {
+  auto uri = URI("http//example.com");
+  uri.toString.should.equal("http://example.com");
 }
 
 

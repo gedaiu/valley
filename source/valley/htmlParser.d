@@ -124,4 +124,7 @@ unittest {
 
   "http://informit.com/articles/article.aspx?p=1609144".toAbsoluteLink("http://dlang.org").should.equal("http://informit.com/articles/article.aspx?p=1609144");
   "//informit.com/articles/article.aspx?p=1609144".toAbsoluteLink("http://dlang.org").should.equal("http://informit.com/articles/article.aspx?p=1609144");
+
+  "../Static:ABC".toAbsoluteLink("https://page.com/congress/Other:MCCL").should.equal("https://page.com/Static:ABC");
+  "http//other.com".toAbsoluteLink("https://page.com").should.equal("http://other.com");
 }
