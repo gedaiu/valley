@@ -330,7 +330,7 @@ class SQLiteStorage : Storage {
     selectPage = db.prepare("SELECT * FROM pages WHERE location = :location");
     pageCount = db.prepare("SELECT count(*) FROM pages WHERE location = :location");
     pageId = db.prepare("SELECT id FROM pages WHERE location = :location");
-    expiredPages = db.prepare("SELECT location FROM pages WHERE time < :time LIMIT :count");
+    expiredPages = db.prepare("SELECT location FROM pages WHERE time < :time AND location LIKE :authority LIMIT :count");
 
     lastInsertId = db.prepare("SELECT last_insert_rowid()");
   }
@@ -381,6 +381,7 @@ class SQLiteStorage : Storage {
     auto time = Clock.currTime - expire;
     expiredPages.bind(":time", time.toUnixTime);
     expiredPages.bind(":count", count);
+    expiredPages.bind(":authority", "%//" ~ authority ~ "%");
 
     foreach (Row row; expiredPages.execute) {
       list ~= URI(row["location"].as!string);

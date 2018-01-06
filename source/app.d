@@ -30,10 +30,9 @@ import valley.stemmer.english;
 import valley.stemmer.cleaner;
 
 Storage storage;
+Crawler crawler;
 
 void crawlerResult(scope CrawlPage crawlPage) {
-  writeln("GOT ", crawlPage.uri);
-
   auto document = new HTMLDocument(crawlPage.uri, crawlPage.content);
 
   auto stem = new EnStemmer;
@@ -81,10 +80,20 @@ auto runApplication() {
   return status;
 }
 
+void fillQueue(immutable string authority) {
+  writeln("Get more links for ", authority);
+  auto seed = storage.pending(1.days, 10, authority);
+
+  foreach(uri; seed) {
+    writeln("add ", uri.toString);
+    crawler.add(uri);
+  }
+}
+
 int main() {
   storage = new SQLiteStorage("data.db");
 
-  auto crawler = new Crawler(
+  crawler = new Crawler(
     "Valley (https://github.com/gedaiu/valley)",
     5.seconds,
     CrawlerSettings([
@@ -100,20 +109,7 @@ int main() {
   crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
   crawler.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
 
-  runTask({
-    auto seed = storage.pending(1.days, 100);
-
-    if(seed.length == 0) {
-      writeln("There are no expired pages. Using the default seed.");
-
-      return;
-    }
-
-    foreach(uri; seed) {
-      writeln(uri.toString);
-      crawler.add(uri);
-    }
-  });
+  crawler.onEmptyQueue(&fillQueue);
 
   ///
   runTask({

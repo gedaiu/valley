@@ -198,7 +198,7 @@ class Crawler {
   }
 
   void onEmptyQueue(T)(T event) {
-    this.emptyQueue = event;
+    this.emptyQueue = event.toDelegate;
   }
 
   void onRequest(T)(T request) {

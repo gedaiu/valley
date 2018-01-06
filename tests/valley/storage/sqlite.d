@@ -352,5 +352,42 @@ private alias suite = Spec!({
         });
       });
     });
+
+    describe("when a page with external links is added", {
+      SQLiteStorage storage;
+      Database db;
+
+      beforeEach({
+        if("test.db".exists) {
+          "test.db".remove;
+        }
+
+        storage = new SQLiteStorage("test.db");
+
+        auto data = PageData(
+          "some title",
+          URI("http://example.com"),
+          "some description",
+          Clock.currTime,
+
+          [ URI("http://other.com/page1"), URI("http://misc.com:8080/page2") ],
+          [],
+          [],
+          InformationType.webPage
+        );
+
+        storage.add(data);
+        db = Database("test.db");
+      });
+
+      afterEach({
+        storage.close;
+        "test.db".remove;
+      });
+
+      it("should not get the external links for the pending example authority", {
+        storage.pending(0.seconds, 2, "example.com").should.equal([ ]);
+      });
+    });
   });
 });
