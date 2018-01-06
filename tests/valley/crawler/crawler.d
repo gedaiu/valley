@@ -254,7 +254,7 @@ private alias suite = Spec!({
       fetchedUris.should.containOnly(["http://white.com/robots.txt", "http://white.com"]);
     });
 
-    it("should trigger an event when there is no page available to scrape", {
+    it("should trigger an event when there is no page available to scrape for a domain", {
       string emptyAuthority;
       void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
         string[string] headers;
@@ -265,17 +265,38 @@ private alias suite = Spec!({
         emptyAuthority = authority;
       }
 
-      auto crawler = new Crawler("", 0.seconds, CrawlerSettings([ "white.com" ]));
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings([ "white.com:8080" ]));
       crawler.onRequest(&requestHandler);
       crawler.onResult(&nullSinkResult);
       crawler.onEmptyQueue(&emptyQueueEvent);
 
-      crawler.add(URI("http://white.com"));
-      crawler.add(URI("http://white.com/page.html"));
+      crawler.add(URI("http://white.com:8080"));
+      crawler.add(URI("http://white.com:8080/page.html"));
       crawler.next();
       emptyAuthority.should.equal("");
       crawler.next();
-      emptyAuthority.should.equal("white.com");
+      emptyAuthority.should.equal("white.com:8080");
+    });
+
+    it("should trigger an event for each domain when there is no page available to scrape", {
+      string[] emptyAuthority;
+      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+        string[string] headers;
+        callback(CrawlPage(uri, 200, headers, ""));
+      }
+
+      void emptyQueueEvent(immutable string authority) {
+        emptyAuthority ~= authority;
+      }
+
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings([ "white.com:8080", "other.com" ]));
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&nullSinkResult);
+      crawler.onEmptyQueue(&emptyQueueEvent);
+
+      crawler.add(URI("http://white.com:8080"));
+      crawler.next();
+      emptyAuthority.should.containOnly(["white.com:8080", "other.com"]);
     });
   });
 

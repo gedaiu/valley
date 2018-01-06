@@ -99,7 +99,7 @@ struct CrawlPage {
 
 /// The Crawler settings
 immutable struct CrawlerSettings {
-  string[] domainWhitelist;
+  string[] authorityWhitelist;
 }
 
 ///
@@ -151,7 +151,7 @@ class Crawler {
 
   ///
   void add(URI uri) {
-    if (!settings.domainWhitelist.canFind(uri.host)) {
+    if (!settings.authorityWhitelist.canFind(uri.authority.toString)) {
       return;
     }
 
@@ -186,6 +186,11 @@ class Crawler {
     freeQueues.front.busy = true;
     auto uri = freeQueues.front.pop;
     this.request(uri, &responseHandler);
+
+    if(queues.byValue.filter!"!a.empty".empty && emptyQueue !is null) {
+      settings.authorityWhitelist.each!(a => emptyQueue(a));
+      return;
+    }
 
     if(freeQueues.front.empty && emptyQueue !is null) {
       emptyQueue(uri.authority.toString);

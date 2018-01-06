@@ -30,9 +30,10 @@ import valley.stemmer.english;
 import valley.stemmer.cleaner;
 
 Storage storage;
-HTTPClientSettings httpSettings;
 
 void crawlerResult(scope CrawlPage crawlPage) {
+  writeln("GOT ", crawlPage.uri);
+
   auto document = new HTMLDocument(crawlPage.uri, crawlPage.content);
 
   auto stem = new EnStemmer;
@@ -54,19 +55,6 @@ void crawlerResult(scope CrawlPage crawlPage) {
   );
 
   storage.add(page);
-}
-
-void vibeRequest(const URI uri, void delegate(scope CrawlPage) @system callback) {
-  requestHTTP(uri.toString, (scope req) {  }, (scope HTTPClientResponse res) {
-    writeln("GOT ", uri.toString);
-    string[string] headers;
-
-    foreach(string key, string value; res.headers.byKeyValue) {
-      headers[key] = value;
-    }
-
-    callback(CrawlPage(uri, res.statusCode, headers, res.bodyReader.readAllUTF8));
-  }, httpSettings);
 }
 
 auto runApplication() {
@@ -94,9 +82,6 @@ auto runApplication() {
 }
 
 int main() {
-  httpSettings = new HTTPClientSettings();
-  httpSettings.dnsAddressFamily = std.socket.AddressFamily.INET;
-
   storage = new SQLiteStorage("data.db");
 
   auto crawler = new Crawler(
@@ -108,17 +93,19 @@ int main() {
       "stackoverflow.com" ]
     ));
 
-  crawler.onRequest(&vibeRequest);
+  crawler.onRequest(&request);
   crawler.onResult(&crawlerResult);
+
+  crawler.add(URI("http://dlang.org"));
+  crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
+  crawler.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
 
   runTask({
     auto seed = storage.pending(1.days, 100);
 
     if(seed.length == 0) {
       writeln("There are no expired pages. Using the default seed.");
-      crawler.add(URI("http://dlang.org"));
-      crawler.add(URI("https://stackoverflow.com/questions/tagged/d"));
-      crawler.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
+
       return;
     }
 
@@ -128,6 +115,7 @@ int main() {
     }
   });
 
+  ///
   runTask({
     while(true) {
       try {
