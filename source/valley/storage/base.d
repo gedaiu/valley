@@ -41,5 +41,5 @@ interface Storage {
   void remove(URI);
   PageData[] query(string);
 
-  URI[] pending(Duration);
+  URI[] pending(const Duration, const size_t count, const string pending = "");
 }

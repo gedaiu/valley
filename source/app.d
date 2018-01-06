@@ -112,7 +112,7 @@ int main() {
   crawler.onResult(&crawlerResult);
 
   runTask({
-    auto seed = storage.pending(1.days);
+    auto seed = storage.pending(1.days, 100);
 
     if(seed.length == 0) {
       writeln("There are no expired pages. Using the default seed.");

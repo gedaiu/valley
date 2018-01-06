@@ -330,7 +330,7 @@ class SQLiteStorage : Storage {
     selectPage = db.prepare("SELECT * FROM pages WHERE location = :location");
     pageCount = db.prepare("SELECT count(*) FROM pages WHERE location = :location");
     pageId = db.prepare("SELECT id FROM pages WHERE location = :location");
-    expiredPages = db.prepare("SELECT location FROM pages WHERE time < :time");
+    expiredPages = db.prepare("SELECT location FROM pages WHERE time < :time LIMIT :count");
 
     lastInsertId = db.prepare("SELECT last_insert_rowid()");
   }
@@ -375,11 +375,12 @@ class SQLiteStorage : Storage {
     return result.oneValue!ulong;
   }
 
-  URI[] pending(Duration expire) {
+  URI[] pending(const Duration expire, const size_t count, const string authority = "") {
     URI[] list = [];
 
     auto time = Clock.currTime - expire;
     expiredPages.bind(":time", time.toUnixTime);
+    expiredPages.bind(":count", count);
 
     foreach (Row row; expiredPages.execute) {
       list ~= URI(row["location"].as!string);

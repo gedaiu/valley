@@ -253,6 +253,30 @@ private alias suite = Spec!({
 
       fetchedUris.should.containOnly(["http://white.com/robots.txt", "http://white.com"]);
     });
+
+    it("should trigger an event when there is no page available to scrape", {
+      string emptyAuthority;
+      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+        string[string] headers;
+        callback(CrawlPage(uri, 200, headers, ""));
+      }
+
+      void emptyQueueEvent(immutable string authority) {
+        emptyAuthority = authority;
+      }
+
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings([ "white.com" ]));
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&nullSinkResult);
+      crawler.onEmptyQueue(&emptyQueueEvent);
+
+      crawler.add(URI("http://white.com"));
+      crawler.add(URI("http://white.com/page.html"));
+      crawler.next();
+      emptyAuthority.should.equal("");
+      crawler.next();
+      emptyAuthority.should.equal("white.com");
+    });
   });
 
   describe("vibe request", {

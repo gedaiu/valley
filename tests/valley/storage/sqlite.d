@@ -57,7 +57,7 @@ private alias suite = Spec!({
       });
 
       it("should mark empty pages as pending", {
-        storage.pending(0.seconds).should.containOnly([ URI("http://example.com/page1"), URI("http://example.com/page2")]);
+        storage.pending(0.seconds, 2, "example.com").should.containOnly([ URI("http://example.com/page1"), URI("http://example.com/page2")]);
       });
 
       it("should contain only 3 pages", {

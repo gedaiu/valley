@@ -42,7 +42,7 @@ class UriQueue {
   }
 
   bool busy() const {
-    if(_busy) {
+    if (_busy) {
       return true;
     }
 
@@ -50,7 +50,7 @@ class UriQueue {
   }
 
   void busy(bool value) {
-    if(!value) {
+    if (!value) {
       lastFetch = Clock.currTime;
     }
 
@@ -60,16 +60,16 @@ class UriQueue {
   /// Add a new uri to the queue. If the uri was
   /// previously added it will be ignored
   void add(const URI uri) {
-    enforce(uri.host == authority.host , "Can not add uris from a different host.");
+    enforce(uri.host == authority.host, "Can not add uris from a different host.");
 
-    if(!agent.canAccess(uri)) {
+    if (!agent.canAccess(uri)) {
       return;
     }
 
     string strUri = uri.toString;
     bool isNotProcessed = queue.map!"a.toString".filter!(a => a == strUri).empty;
 
-    if(isNotProcessed) {
+    if (isNotProcessed) {
       queue ~= uri;
     }
   }
@@ -103,10 +103,9 @@ immutable struct CrawlerSettings {
 }
 
 ///
-class Crawler
-{
-  private
-  {
+class Crawler {
+  private {
+    void delegate(immutable string authority) emptyQueue;
     void delegate(scope CrawlPage) callback;
     void delegate(const URI uri, void delegate(scope CrawlPage) @system callback) request;
 
@@ -127,13 +126,12 @@ class Crawler
     this.settings = settings;
   }
 
-  private void responseHandler(scope CrawlPage page)
-  {
+  private void responseHandler(scope CrawlPage page) {
     queues[page.uri.host].busy = false;
     queues[page.uri.host].lastFetch = Clock.currTime;
 
-    if(page.statusCode > 300 && page.statusCode < 400) {
-      if("Location" in page.headers) {
+    if (page.statusCode > 300 && page.statusCode < 400) {
+      if ("Location" in page.headers) {
         URI uri = URI(page.headers["Location"]);
 
         auto scheme = uri.scheme.value == "" ? page.uri.scheme : uri.scheme;
@@ -152,13 +150,12 @@ class Crawler
   }
 
   ///
-  void add(URI uri)
-  {
-    if(!settings.domainWhitelist.canFind(uri.host)) {
+  void add(URI uri) {
+    if (!settings.domainWhitelist.canFind(uri.host)) {
       return;
     }
 
-    if(uri.host in queues) {
+    if (uri.host in queues) {
       queues[uri.host].add(uri);
       return;
     }
@@ -166,55 +163,57 @@ class Crawler
     pending[uri.host] ~= uri;
 
     void robotsHandler(scope CrawlPage page) {
-      queues[uri.host] = new UriQueue(Robots(page.content).get(agentName), uri.authority, defaultDelay);
+      queues[uri.host] = new UriQueue(Robots(page.content).get(agentName),
+          uri.authority, defaultDelay);
 
-      foreach(uri; pending[uri.host]) {
+      foreach (uri; pending[uri.host]) {
         queues[uri.host].add(uri);
       }
     }
 
-    if(pending[uri.host].length == 1) {
+    if (pending[uri.host].length == 1) {
       this.request(uri ~ "/robots.txt".path, &robotsHandler);
     }
   }
 
-  void next()
-  {
-    auto freeQueues = queues
-      .byValue
-        .filter!"!a.empty"
-        .filter!(a => !a.busy);
+  void next() {
+    auto freeQueues = queues.byValue.filter!"!a.empty".filter!(a => !a.busy);
 
-    if(freeQueues.empty) {
+    if (freeQueues.empty) {
       return;
     }
 
     freeQueues.front.busy = true;
-    this.request(freeQueues.front.pop, &responseHandler);
+    auto uri = freeQueues.front.pop;
+    this.request(uri, &responseHandler);
+
+    if(freeQueues.front.empty && emptyQueue !is null) {
+      emptyQueue(uri.authority.toString);
+    }
   }
 
-  void onRequest(T)(T request)
-  {
+  void onEmptyQueue(T)(T event) {
+    this.emptyQueue = event;
+  }
+
+  void onRequest(T)(T request) {
     this.request = request.toDelegate;
   }
 
-  void onResult(T)(T callback)
-  {
+  void onResult(T)(T callback) {
     this.callback = callback.toDelegate;
   }
 }
 
 /// Perform an http request
-void request(const URI uri, void delegate(scope CrawlPage) callback)
-{
+void request(const URI uri, void delegate(scope CrawlPage) callback) {
   HTTPClientSettings settings = new HTTPClientSettings;
   settings.dnsAddressFamily = AddressFamily.INET;
 
   requestHTTP(uri.toString, (scope HTTPClientRequest req) {  }, (scope HTTPClientResponse res) {
     string[string] headers;
 
-    foreach (string key, string value; res.headers)
-    {
+    foreach (string key, string value; res.headers) {
       headers[key] = value;
     }
 

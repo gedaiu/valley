@@ -38,7 +38,7 @@ class HTMLDocument {
 
     foreach(a; doc.querySelectorAll("a")) {
       if(a.hasAttr("href")) {
-        list ~= a.attr("href").strip.to!string.toAbsoluteLink(uri.toString);
+        list ~= a.attr("href").strip.to!string.toAbsoluteLink(uri.toString).removeFragment;
       }
     }
 
@@ -107,6 +107,11 @@ string toAbsoluteLink(string link, string base) {
   }
 
   return (baseUri.scheme ~ baseUri.authority ~ baseUri.path ~ linkUri.path ~ linkUri.query).toString;
+}
+
+string removeFragment(string link) {
+  auto linkUri = URI(link);
+  return (linkUri.scheme ~ linkUri.authority ~ linkUri.path ~ linkUri.query).toString;
 }
 
 /// It should get the absolute link
