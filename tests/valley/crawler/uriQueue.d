@@ -57,5 +57,13 @@ private alias suite = Spec!({
       ({ queue.add(URI("http://other.com/index.html")); }).should.throwAnyException.withMessage.equal(
       "Can not add uris from a different host.");
     });
+
+    it("should pop the exact uri", {
+      auto queue = new UriQueue(Agent(), Authority("events.ccc.de"), 0.seconds);
+
+      queue.add(URI("https://events.ccc.de/congress/2017/wiki/index.php?title=Calendar:Session&action=edit&redlink=1"));
+
+      queue.pop.toString.should.equal("https://events.ccc.de/congress/2017/wiki/index.php?title=Calendar:Session&action=edit&redlink=1");
+    });
   });
 });

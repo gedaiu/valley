@@ -171,7 +171,7 @@ struct Path {
 
       foreach(piece; cleanPieces) {
         if(piece == "..") {
-          skip += 2;
+          skip += 1;
           continue;
         }
 
@@ -192,7 +192,26 @@ struct Path {
       return finalPieces.join('/');
     }
 
-    string toString() {
+    immutable(Path) parent() pure {
+      if(value == "/") {
+        return Path("/");
+      }
+
+      if(value == "") {
+        return Path("");
+      }
+
+      auto cleanPieces = toString.split("/");
+      auto localParent = cleanPieces[0..$-1];
+
+      if(localParent == [""]) {
+        return Path("/");
+      }
+
+      return Path(localParent.join("/"));
+    }
+
+    string toString() pure {
       auto pieces = value.split("/").filter!`a != "."`.array;
 
       if(pieces.length == 0) {
@@ -221,7 +240,11 @@ struct Path {
           return rhs;
         }
 
-        auto tmp = value.endsWith('/') ? Path(value ~ rhs.toString) : Path(value ~ "/" ~ rhs.toString);
+        string rhsValue = rhs.toString;
+
+        string currentParent = this.parent.toString;
+
+        auto tmp = currentParent.endsWith('/') ? Path(currentParent ~ rhsValue) : Path(currentParent ~ "/" ~ rhsValue);
 
         return Path(tmp.toNormalizedString);
       } else {
@@ -244,6 +267,31 @@ Path path(const string value) pure {
   return Path(value);
 }
 
+/// The parent of the root path should be root
+unittest {
+  Path("/").parent.toString.should.equal("/");
+}
+
+/// The parent of an empty path should be the empty path
+unittest {
+  Path("").parent.toString.should.equal("");
+}
+
+/// The parent of a page path should be the empty path
+unittest {
+  Path("index.html").parent.toString.should.equal("");
+}
+
+/// The parent of a root page path should be the root path
+unittest {
+  Path("/index.html").parent.toString.should.equal("/");
+}
+
+/// Should be able to get page parent
+unittest {
+  Path("/a/index.html").parent.toString.should.equal("/a");
+}
+
 /// Path absolute
 unittest {
   Path("").isAbsolute.should.equal(false);
@@ -255,7 +303,7 @@ unittest {
 /// Concatenate paths
 unittest {
   (Path("/path") ~ Path("/other")).toString.should.equal("/other");
-  (Path("/path") ~ Path("other")).toString.should.equal("/path/other");
+  (Path("/path") ~ Path("other")).toString.should.equal("/other");
   (Path("/path/") ~ Path("other")).toString.should.equal("/path/other");
   (Path("/path/") ~ Path("./other")).toString.should.equal("/path/other");
   (Path("/path/") ~ Path("other//")).toString.should.equal("/path/other/");
@@ -264,6 +312,13 @@ unittest {
   (Path("/") ~ Path("/")).toString.should.equal("/");
   (Path("/congress/Other.html") ~ Path("../Static.html")).toString.should.equal("/Static.html");
   (Path("/congress") ~ Path("../Static.html")).toString.should.equal("/Static.html");
+}
+
+/// it should replace the last path node if the appended path has no /
+unittest {
+  auto result = Path("/spec/spec.html") ~ Path("expression.html");
+
+  result.toString.should.equal("/spec/expression.html");
 }
 
 /// Normalize paths
@@ -302,7 +357,6 @@ struct URI {
 
   this(const string uri) pure {
     auto tmpUri = uri.dup;
-
     auto pos = tmpUri.indexOf("//");
 
     if(pos > 0) {
@@ -335,21 +389,25 @@ struct URI {
       tmpUri = tmpUri[pos..$];
     }
 
-    pos = tmpUri.indexOf("?");
-    if(pos == -1) {
+    auto queryPos = tmpUri.indexOf("?");
+    auto fragmentPos = tmpUri.indexOf("#");
+
+    if(queryPos == -1 && fragmentPos == -1) {
       path = Path(tmpUri.idup);
       return;
+    } else if(queryPos != -1){
+      path = Path(tmpUri[0..queryPos].idup);
+    } else {
+      path = Path(tmpUri[0..fragmentPos].idup);
     }
 
-    path = Path(tmpUri[0..pos].idup);
-    tmpUri = tmpUri[pos + 1..$];
-
-    pos = tmpUri.indexOf("#");
-    if(pos > -1) {
-      query = Query(tmpUri[0..pos].idup);
-      fragment = tmpUri[pos + 1..$].idup;
-    } else {
-      query = Query(tmpUri.idup);
+    if(queryPos != -1 && fragmentPos != -1) {
+      query = Query(tmpUri[queryPos + 1 .. fragmentPos].idup);
+      fragment = tmpUri[fragmentPos + 1..$].idup;
+    } else if(fragmentPos == -1) {
+      query = Query(tmpUri[queryPos + 1 .. $].idup);
+    } else if(fragmentPos == -1) {
+      fragment =tmpUri[fragmentPos + 1 .. $].idup;
     }
   }
 
@@ -430,6 +488,34 @@ unittest {
   uri.query.value.should.equal("key=value&key2=value2");
   uri.fragment.should.equal("fragid1");
   uri.toString.should.equal("abc://username:password@example.com:123/path/data?key=value&key2=value2#fragid1");
+}
+
+/// Parse an url with all the elements and empty fragment
+unittest {
+  auto uri = URI("abc://username:password@example.com:123/path/data?key=value&key2=value2#");
+
+  uri.scheme.value.should.equal("abc");
+  uri.userInformation.should.equal("username:password");
+  uri.host.should.equal("example.com");
+  uri.port.should.equal(123);
+  uri.path.value.should.equal("/path/data");
+  uri.query.value.should.equal("key=value&key2=value2");
+  uri.fragment.should.equal("");
+  uri.toString.should.equal("abc://username:password@example.com:123/path/data?key=value&key2=value2");
+}
+
+/// Parse an url with no query string and empty fragment
+unittest {
+  auto uri = URI("abc://username:password@example.com:123/path/data#");
+
+  uri.scheme.value.should.equal("abc");
+  uri.userInformation.should.equal("username:password");
+  uri.host.should.equal("example.com");
+  uri.port.should.equal(123);
+  uri.path.value.should.equal("/path/data");
+  uri.query.value.should.equal("");
+  uri.fragment.should.equal("");
+  uri.toString.should.equal("abc://username:password@example.com:123/path/data");
 }
 
 /// Parse an url without scheme and user information

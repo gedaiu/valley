@@ -7,6 +7,8 @@ enum InformationType : uint {
   webPage = 0,
   webImage = 1,
 
+  redirect = uint.max - 2,
+  userError = uint.max - 1,
   other = uint.max
 }
 

@@ -34,6 +34,7 @@ Crawler crawler;
 
 
 void storeUnknownPage(scope CrawlPage crawlPage) {
+  writeln("store unknown page");
   auto page = PageData(
     "",
     crawlPage.uri,
@@ -46,14 +47,76 @@ void storeUnknownPage(scope CrawlPage crawlPage) {
     InformationType.other
   );
 
-  storage.add(page);
+  try {
+    storage.add(page);
+  } catch(Exception e) {
+    writeln("cannot save page to db `", crawlPage.uri ,"`: ", e.msg);
+  }
 }
 
-void crawlerResult(scope CrawlPage crawlPage) {
-  writeln("GOT: ", crawlPage.statusCode, " ", crawlPage.uri);
+void storeRedirect(scope CrawlPage crawlPage) {
+  writeln("store redirect");
+
+  if("Location" !in crawlPage.headers) {
+    storeUnknownPage(crawlPage);
+  }
+
+  auto page = PageData(
+    "Redirect to " ~ crawlPage.headers["Location"],
+    crawlPage.uri,
+    crawlPage.statusCode.to!string,
+    Clock.currTime,
+
+    [URI(crawlPage.headers["Location"])],
+    [],
+    [],
+    InformationType.redirect
+  );
+
+  try {
+    storage.add(page);
+  } catch(Exception e) {
+    writeln("cannot save page to db `", crawlPage.uri ,"`: ", e.msg);
+  }
+}
+
+void storeUserError(scope CrawlPage crawlPage) {
+  writeln("store user error");
+
+  auto page = PageData(
+    crawlPage.statusCode.to!string ~ " error",
+    crawlPage.uri,
+    "",
+    Clock.currTime,
+
+    [],
+    [],
+    [],
+    InformationType.userError
+  );
+
+  try {
+    storage.add(page);
+  } catch(Exception e) {
+    writeln("cannot save page to db `", crawlPage.uri ,"`: ", e.msg);
+  }
+}
+
+void crawlerResult(bool success, scope CrawlPage crawlPage) {
+  writeln("GOT: ", success, " ", crawlPage.statusCode, " ", crawlPage.uri);
   writeln(crawlPage.headers);
 
-  if("Content-Type" !in crawlPage.headers || !crawlPage.headers["Content-Type"].startsWith("text/html")) {
+  if(crawlPage.statusCode >= 300 && crawlPage.statusCode < 400) {
+    storeRedirect(crawlPage);
+    return;
+  }
+
+  if(crawlPage.statusCode >= 400 && crawlPage.statusCode < 500) {
+    storeUserError(crawlPage);
+    return;
+  }
+
+  if(crawlPage.content == "" || !success || "Content-Type" !in crawlPage.headers || !crawlPage.headers["Content-Type"].startsWith("text/html")) {
     storeUnknownPage(crawlPage);
     return;
   }
@@ -78,7 +141,11 @@ void crawlerResult(scope CrawlPage crawlPage) {
     InformationType.webPage
   );
 
-  storage.add(page);
+  try {
+    storage.add(page);
+  } catch(Exception e) {
+    writeln("cannot save page to db `", crawlPage.uri ,"`: ", e.msg);
+  }
 }
 
 auto runApplication() {
@@ -122,9 +189,10 @@ int main() {
     "Valley (https://github.com/gedaiu/valley)",
     5.seconds,
     CrawlerSettings([
-      "dlang.org", "forum.dlang.org", "code.dlang.org",
+      "dlang.org", "forum.dlang.org", "code.dlang.org", "wiki.dlang.org", "blog.dlang.org"
       "events.ccc.de",
-      "stackoverflow.com" ]
+      "stackoverflow.com"
+      ]
     ));
 
   crawler.onRequest(&request);

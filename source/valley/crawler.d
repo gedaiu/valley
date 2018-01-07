@@ -10,6 +10,7 @@ import std.functional;
 import std.socket;
 import std.datetime;
 import std.algorithm;
+import std.utf;
 import std.exception;
 
 /// A special uri queue used by the crawler to fetch new pages.
@@ -30,6 +31,11 @@ class UriQueue {
 
     bool _busy;
     SysTime lastFetch;
+  }
+
+  ///
+  this(const Authority authority, Duration delay) {
+    this(Agent(), authority, delay);
   }
 
   ///
@@ -106,8 +112,8 @@ immutable struct CrawlerSettings {
 class Crawler {
   private {
     void delegate(immutable string authority) emptyQueue;
-    void delegate(scope CrawlPage) callback;
-    void delegate(const URI uri, void delegate(scope CrawlPage) @system callback) request;
+    void delegate(bool success, scope CrawlPage) callback;
+    void delegate(const URI uri, void delegate(bool success, scope CrawlPage) @system callback) request;
 
     UriQueue[string] queues;
     URI[][string] pending;
@@ -126,11 +132,11 @@ class Crawler {
     this.settings = settings;
   }
 
-  private void responseHandler(scope CrawlPage page) {
+  private void responseHandler(bool success, scope CrawlPage page) {
     queues[page.uri.host].busy = false;
     queues[page.uri.host].lastFetch = Clock.currTime;
 
-    if (page.statusCode > 300 && page.statusCode < 400) {
+    if (page.statusCode >= 300 && page.statusCode < 400) {
       if ("Location" in page.headers) {
         URI uri = URI(page.headers["Location"]);
 
@@ -142,11 +148,9 @@ class Crawler {
 
         add(URI(scheme, authority, path, query, fragment));
       }
-
-      return;
     }
 
-    this.callback(page);
+    this.callback(success, page);
   }
 
   ///
@@ -162,9 +166,13 @@ class Crawler {
 
     pending[uri.host] ~= uri;
 
-    void robotsHandler(scope CrawlPage page) {
-      queues[uri.host] = new UriQueue(Robots(page.content).get(agentName),
-          uri.authority, defaultDelay);
+    void robotsHandler(bool success, scope CrawlPage page) {
+      if(success) {
+        queues[uri.host] = new UriQueue(Robots(page.content).get(agentName),
+            uri.authority, defaultDelay);
+      } else {
+        queues[uri.host] = new UriQueue(uri.authority, defaultDelay);
+      }
 
       foreach (uri; pending[uri.host]) {
         queues[uri.host].add(uri);
@@ -211,19 +219,31 @@ class Crawler {
 }
 
 /// Perform an http request
-void request(const URI uri, void delegate(scope CrawlPage) callback) {
+void request(const URI uri, void delegate(bool success, scope CrawlPage) callback) {
+  import std.stdio;
+  writeln("GET: ", uri.toString);
   HTTPClientSettings settings = new HTTPClientSettings;
   settings.dnsAddressFamily = AddressFamily.INET;
 
-  requestHTTP(uri.toString, (scope HTTPClientRequest req) {  }, (scope HTTPClientResponse res) {
-    string[string] headers;
+  try {
+    requestHTTP(uri.toString, (scope HTTPClientRequest req) {  }, (scope HTTPClientResponse res) {
+      string[string] headers;
 
-    foreach (string key, string value; res.headers) {
-      headers[key] = value;
-    }
+      foreach (string key, string value; res.headers) {
+        headers[key] = value;
+      }
 
-    auto page = CrawlPage(uri, res.statusCode, headers, res.bodyReader.readAllUTF8());
+      string content;
 
-    callback(page);
-  }, settings);
+      try {
+        content = res.bodyReader.readAllUTF8(true);
+      } catch(UTFException) {
+        callback(false, CrawlPage(uri, res.statusCode, headers));
+      }
+
+      callback(true, CrawlPage(uri, res.statusCode, headers, content));
+    }, settings);
+  } catch(Exception) {
+    callback(false, CrawlPage(uri));
+  }
 }

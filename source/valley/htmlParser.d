@@ -101,18 +101,18 @@ unittest {
   html.links.length.should.be.greaterThan(0);
 }
 
-string toAbsoluteLink(string link, string base) {
+string toAbsoluteLink(const string link, const string base) pure {
   auto linkUri = URI(link);
   auto baseUri = URI(base);
 
   if(linkUri.host != "") {
-    return linkUri.scheme.value != "" ? linkUri.toString : (baseUri.scheme ~ linkUri).toString;
+    return linkUri.scheme.value != "" ? linkUri.toString : (baseUri.scheme ~ linkUri).toString.removeFragment;
   }
 
-  return (baseUri.scheme ~ baseUri.authority ~ baseUri.path ~ linkUri.path ~ linkUri.query).toString;
+  return (baseUri.scheme ~ baseUri.authority ~ baseUri.path ~ linkUri.path ~ linkUri.query).toString.removeFragment;
 }
 
-string removeFragment(string link) {
+string removeFragment(const string link) pure {
   auto linkUri = URI(link);
   return (linkUri.scheme ~ linkUri.authority ~ linkUri.path ~ linkUri.query).toString;
 }
@@ -124,6 +124,8 @@ unittest {
   "../documentation.html".toAbsoluteLink("http://example.com/index.html").should.equal("http://example.com/documentation.html");
 
   "documentation.html".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/pages/documentation.html");
+  "documentation.html#".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/pages/documentation.html");
+  "documentation.html#fragment".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/pages/documentation.html");
   "documentation.html".toAbsoluteLink("http://example.com/pages/?some").should.equal("http://example.com/pages/documentation.html");
 
   "/documentation.html".toAbsoluteLink("http://example.com/pages/").should.equal("http://example.com/documentation.html");

@@ -16,10 +16,10 @@ import std.conv;
 
 import trial.step;
 
-void nullSinkResult(scope CrawlPage) {
+void nullSinkResult(bool, scope CrawlPage) {
 }
 
-void failureRequest(const URI uri, void delegate(scope CrawlPage) @system callback) {
+void failureRequest(const URI uri, void delegate(bool success, scope CrawlPage) @system callback) {
   assert(false, "No request should be performed");
 }
 
@@ -31,7 +31,7 @@ private alias suite = Spec!({
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       int index;
 
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool success, scope CrawlPage) @system callback) {
         scope (exit) {
           index++;
         }
@@ -45,7 +45,7 @@ private alias suite = Spec!({
         }
 
         string[string] headers;
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
       crawler.onRequest(&requestHandler);
@@ -60,11 +60,11 @@ private alias suite = Spec!({
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         fetchedUris ~= uri.toString;
 
         string[string] headers;
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
       crawler.onRequest(&requestHandler);
@@ -81,19 +81,19 @@ private alias suite = Spec!({
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com", "other.com"]));
       string[] fetchedUris;
 
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         string[string] headers;
 
         if (uri.toString == "http://something.com") {
           headers["Location"] = "https://other.com/";
-          callback(CrawlPage(uri, 301, headers, ""));
+          callback(true, CrawlPage(uri, 301, headers, ""));
           return;
         }
 
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
-      void pageResult(scope CrawlPage page) {
+      void pageResult(bool, scope CrawlPage page) {
         fetchedUris ~= page.uri.toString;
       }
 
@@ -110,19 +110,19 @@ private alias suite = Spec!({
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         string[string] headers;
 
         if (uri.toString == "http://something.com") {
           headers["Location"] = "/index.html";
-          callback(CrawlPage(uri, 301, headers, ""));
+          callback(true, CrawlPage(uri, 301, headers, ""));
           return;
         }
 
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
-      void pageResult(scope CrawlPage page) {
+      void pageResult(bool, scope CrawlPage page) {
         fetchedUris ~= page.uri.toString;
       }
 
@@ -139,19 +139,19 @@ private alias suite = Spec!({
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         string[string] headers;
 
         if (uri.toString == "http://something.com") {
           headers["Location"] = "//something.com/";
-          callback(CrawlPage(uri, 301, headers, ""));
+          callback(true, CrawlPage(uri, 301, headers, ""));
           return;
         }
 
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
-      void pageResult(scope CrawlPage page) {
+      void pageResult(bool, scope CrawlPage page) {
         fetchedUris ~= page.uri.toString;
       }
 
@@ -171,12 +171,12 @@ private alias suite = Spec!({
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
       string[] fetchedUris;
 
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         yield;
         fetchedUris ~= uri.toString;
 
         string[string] headers;
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
       crawler.onRequest(&requestHandler);
@@ -211,11 +211,11 @@ private alias suite = Spec!({
       string[] fetchedUris;
 
       int index;
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         fetchedUris ~= uri.toString;
 
         string[string] headers;
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
         index++;
       }
 
@@ -234,11 +234,11 @@ private alias suite = Spec!({
 
     it("should GET pages only from the whitelisted domains", {
       string[] fetchedUris;
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         fetchedUris ~= uri.toString;
 
         string[string] headers;
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings([ "white.com" ]));
@@ -256,9 +256,9 @@ private alias suite = Spec!({
 
     it("should trigger an event when there is no page available to scrape for a domain", {
       string emptyAuthority;
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         string[string] headers;
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
       void emptyQueueEvent(immutable string authority) {
@@ -280,9 +280,9 @@ private alias suite = Spec!({
 
     it("should trigger an event for each domain when there is no page available to scrape", {
       string[] emptyAuthority;
-      void requestHandler(const URI uri, void delegate(scope CrawlPage) @system callback) {
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
         string[string] headers;
-        callback(CrawlPage(uri, 200, headers, ""));
+        callback(true, CrawlPage(uri, 200, headers, ""));
       }
 
       void emptyQueueEvent(immutable string authority) {
@@ -305,7 +305,7 @@ private alias suite = Spec!({
       bool hasResult;
       string firstCrawlPage = "http://info.cern.ch/hypertext/WWW/TheProject.html";
 
-      request(URI(firstCrawlPage), (scope CrawlPage page) {
+      request(URI(firstCrawlPage), (bool success, scope CrawlPage page) {
         hasResult = true;
         page.uri.toString.should.equal(firstCrawlPage);
         page.statusCode.should.equal(200);
