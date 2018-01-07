@@ -389,5 +389,54 @@ private alias suite = Spec!({
         storage.pending(0.seconds, 2, "example.com").should.equal([ ]);
       });
     });
+
+    describe("when there is an empty database", {
+      SQLiteStorage storage;
+      Database db;
+
+      beforeEach({
+        if("test.db".exists) {
+          "test.db".remove;
+        }
+
+        storage = new SQLiteStorage("test.db");
+      });
+
+      afterEach({
+        storage.close;
+        "test.db".remove;
+      });
+
+      it("should be able to add an unknown page type", {
+        auto data = PageData(
+          "",
+          URI("http://other.com"),
+          "",
+          Clock.currTime,
+          [],
+          [],
+          [],
+          InformationType.other
+        );
+
+        storage.add(data);
+        db = Database("test.db");
+
+        Statement statement = db.prepare("SELECT * FROM pages WHERE id = 1 LIMIT 1");
+
+        int found = 0;
+        foreach (Row row; statement.execute) {
+          row["id"].as!int.should.equal(1);
+          row["title"].as!string.should.equal("");
+          row["location"].as!string.should.equal("http://other.com");
+          row["time"].as!ulong.should.be.approximately(Clock.currTime.toUnixTime, 2000);
+          row["type"].as!uint.should.equal(uint.max);
+          found++;
+        }
+
+        statement.finalize;
+        found.should.equal(1);
+      });
+    });
   });
 });

@@ -400,7 +400,7 @@ class SQLiteStorage : Storage {
       insertPage.bind(":location", data.location.toString);
       insertPage.bind(":description", data.description);
       insertPage.bind(":time", data.time.toUnixTime);
-      insertPage.bind(":type", data.type.to!int);
+      insertPage.bind(":type", data.type.to!uint);
 
       insertPage.execute;
       insertPage.reset;
@@ -415,7 +415,7 @@ class SQLiteStorage : Storage {
       updatePage.bind(":location", data.location.toString);
       updatePage.bind(":description", data.description);
       updatePage.bind(":time", data.time.toUnixTime);
-      updatePage.bind(":type", data.type.to!int);
+      updatePage.bind(":type", data.type.to!uint);
 
       updatePage.execute;
       updatePage.reset;
