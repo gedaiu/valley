@@ -6,6 +6,13 @@ import std.algorithm;
 import std.array;
 import std.range;
 
+class URIParseException : Exception
+{
+    this(string msg, string file = __FILE__, size_t line = __LINE__) pure {
+        super(msg, file, line);
+    }
+}
+
 struct Scheme {
   immutable(string) value;
 
@@ -318,7 +325,13 @@ struct URI {
       if(pos == -1) {
         pos = tmpUri.length;
       }
-      authority = Authority(tmpUri[0..pos].idup);
+
+      try {
+        authority = Authority(tmpUri[0..pos].idup);
+      } catch(ConvException) {
+        throw new URIParseException("Can not parse the URI authority");
+      }
+
       tmpUri = tmpUri[pos..$];
     }
 
@@ -531,4 +544,11 @@ unittest {
 
   uri.authority.host.should.equal("www.demo.com");
   uri.query.value.should.equal("ref=val");
+}
+
+/// Parse an uri with invalid scheme should throw an exception
+unittest {
+  ({
+    URI("http://http://www.demo.com");
+  }).should.throwException!URIParseException.withMessage.equal("Can not parse the URI authority");
 }

@@ -32,7 +32,32 @@ import valley.stemmer.cleaner;
 Storage storage;
 Crawler crawler;
 
+
+void storeUnknownPage(scope CrawlPage crawlPage) {
+  auto page = PageData(
+    "",
+    crawlPage.uri,
+    "",
+    Clock.currTime,
+
+    [],
+    [],
+    [],
+    InformationType.other
+  );
+
+  storage.add(page);
+}
+
 void crawlerResult(scope CrawlPage crawlPage) {
+  writeln("GOT: ", crawlPage.statusCode, " ", crawlPage.uri);
+  writeln(crawlPage.headers);
+
+  if("Content-Type" !in crawlPage.headers || !crawlPage.headers["Content-Type"].startsWith("text/html")) {
+    storeUnknownPage(crawlPage);
+    return;
+  }
+
   auto document = new HTMLDocument(crawlPage.uri, crawlPage.content);
 
   auto stem = new EnStemmer;

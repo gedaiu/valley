@@ -38,7 +38,10 @@ class HTMLDocument {
 
     foreach(a; doc.querySelectorAll("a")) {
       if(a.hasAttr("href")) {
-        list ~= a.attr("href").strip.to!string.toAbsoluteLink(uri.toString).removeFragment;
+        try {
+          auto link = a.attr("href").strip.to!string.toAbsoluteLink(uri.toString);
+          list ~= link.removeFragment;
+        } catch(URIParseException) {}
       }
     }
 
