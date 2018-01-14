@@ -52,7 +52,7 @@ auto runApplication() {
 
 int main() {
   auto storage = new SQLiteStorage("data.db");
-
+/*
   auto crawlerService = new CrawlerService(storage);
 
   crawlerService.add(URI("http://dlang.org/"));
@@ -62,7 +62,7 @@ int main() {
   crawlerService.add(URI("https://stackoverflow.com/questions/tagged/d"));
   crawlerService.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
 
-  crawlerService.start;
+  crawlerService.start;*/
 
   return runApplication;
 }
