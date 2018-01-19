@@ -20,11 +20,33 @@ import std.string;
 import vibe.core.core;
 import vibe.http.client;
 import vibe.stream.operations;
-
+import vibe.http.websockets: WebSocket, handleWebSockets;
+import vibe.http.router : URLRouter;
+import vibe.http.server;
 
 import valley.uri;
 import valley.storage.sqlite;
 import valley.service.crawler;
+import valley.service.client;
+
+SQLiteStorage storage;
+
+shared static this() {
+  auto router = new URLRouter;
+  router.get("/ws", handleWebSockets(&handleWebSocketConnection));
+
+  auto settings = new HTTPServerSettings;
+  settings.port = 8080;
+  settings.bindAddresses = ["::1", "127.0.0.1"];
+  listenHTTP(settings, router);
+}
+
+void handleWebSocketConnection(scope WebSocket socket) {
+  auto connection = new WebsocketConnection(socket);
+  auto clientService = new ClientService(storage, connection);
+
+  connection.start;
+}
 
 auto runApplication() {
   lowerPrivileges();
@@ -51,8 +73,9 @@ auto runApplication() {
 }
 
 int main() {
-  auto storage = new SQLiteStorage("data.db");
-/*
+  storage = new SQLiteStorage("data.db");
+
+  /*
   auto crawlerService = new CrawlerService(storage);
 
   crawlerService.add(URI("http://dlang.org/"));

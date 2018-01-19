@@ -3,6 +3,8 @@ module valley.service.client;
 import std.string;
 import std.algorithm;
 import std.array;
+import std.range;
+import vibe.http.websockets : WebSocket;
 
 import vibe.data.json;
 
@@ -10,6 +12,7 @@ import valley.storage.base;
 import valley.uri;
 
 struct Result {
+  ulong id;
   string title;
   string description;
   URI location;
@@ -18,6 +21,32 @@ struct Result {
 interface Connection {
   void send(string);
   void onMessage(void delegate(string));
+}
+
+class WebsocketConnection : Connection {
+  private {
+    void delegate(string) messageEvent;
+    WebSocket socket;
+  }
+
+  this(WebSocket socket) {
+    this.socket = socket;
+  }
+
+  void send(string message) {
+    socket.send(message);
+  }
+
+  void onMessage(void delegate(string) messageEvent) {
+    this.messageEvent = messageEvent;
+  }
+
+  void start() {
+    while (socket.waitForData()) {
+      auto txt = socket.receiveText;
+      messageEvent(txt);
+    }
+  }
 }
 
 class ClientService {
@@ -37,18 +66,18 @@ class ClientService {
 
   void onMessage(const string message) {
     auto pos = message.indexOf(":");
-    auto instruction = message[0..pos];
-    auto param = message[pos + 1..$];
+    auto instruction = message[0 .. pos];
+    auto param = message[pos + 1 .. $];
 
-    switch(instruction) {
-      case "query":
-        setQuery(param);
-        break;
-      case "get all":
-        getAll(param);
-        break;
+    switch (instruction) {
+    case "query":
+      setQuery(param);
+      break;
+    case "get all":
+      getAll(param);
+      break;
 
-      default:
+    default:
     }
   }
 
@@ -57,8 +86,9 @@ class ClientService {
   }
 
   void getAll(string model) {
-    auto result = storage.query(queryString).map!(a => Result(a.title, a.description, a.location));
+    auto result = storage.query(queryString).enumerate.map!(a => Result(a[0],
+        a[1].title, a[1].description, a[1].location));
 
-    connection.send(result.array.serializeToJsonString);
+    connection.send(`{"searchResults":` ~ result.array.serializeToJsonString ~ `}`);
   }
 }
