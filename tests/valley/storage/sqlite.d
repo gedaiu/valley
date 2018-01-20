@@ -17,6 +17,7 @@ private alias suite = Spec!({
     describe("when a page is added", {
       SQLiteStorage storage;
       Database db;
+      SysTime time;
 
       beforeEach({
         if("test.db".exists) {
@@ -24,13 +25,14 @@ private alias suite = Spec!({
         }
 
         storage = new SQLiteStorage("test.db");
+        time = SysTime.fromUnixTime(Clock.currTime.toUnixTime);
 
         Badge[] badges = [ Badge(BadgeType.approve, [1, 2, 3]) ];
         auto data = PageData(
           "some title",
           URI("http://example.com"),
           "some description",
-          Clock.currTime,
+          time,
 
           [ URI("http://example.com/page1"), URI("http://example.com/page2") ],
           badges,
@@ -45,6 +47,21 @@ private alias suite = Spec!({
       afterEach({
         storage.close;
         "test.db".remove;
+      });
+
+      it("should query the page", {
+        auto result = storage.query("some description");
+
+        result.length.should.equal(1);
+
+        result[0].title.should.equal("some title");
+        result[0].location.should.equal(URI("http://example.com"));
+        result[0].description.should.equal("some description");
+        result[0].time.should.be.equal(time);
+        result[0].type.should.equal(InformationType.webImage);
+        result[0].relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
+        result[0].keywords.should.equal([ "some", "keywords" ]);
+        result[0].badges.should.equal([ Badge(BadgeType.approve, [1, 2, 3]) ]);
       });
 
       it("should add the page", {

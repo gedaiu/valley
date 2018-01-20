@@ -8,6 +8,8 @@ import std.file;
 import std.conv;
 import std.datetime;
 import std.algorithm;
+import std.string;
+import std.range;
 import std.typecons : Nullable;
 
 void setupSqliteDb(string fileName) {
@@ -291,12 +293,101 @@ class LinkStorage {
   }
 }
 
+class PageStorage {
+  private {
+    Statement queryPage;
+    Statement queryRelations;
+    Statement queryKeywords;
+    Statement queryBadges;
+    Database db;
+  }
+
+  this(Database db) {
+    queryPage = db.prepare("SELECT * FROM pages WHERE id = :id");
+    queryRelations = db.prepare("SELECT pages.location FROM links
+                                  INNER JOIN pages ON links.destinationId = pages.id
+                                  WHERE pageId = :id");
+
+    queryKeywords = db.prepare("SELECT keywords.keyword FROM keywordLinks
+                                  INNER JOIN keywords ON keywordLinks.keywordId = keywords.id
+                                  WHERE pageId = :id");
+
+    queryBadges = db.prepare("SELECT type, signature FROM badges WHERE pageId = :id");
+
+    this.db = db;
+  }
+
+  URI[] getRelations(size_t id) {
+    scope(exit) queryRelations.reset;
+    queryRelations.bind(":id", id);
+    URI[] list;
+
+    foreach(result; queryRelations.execute) {
+      list ~= URI(result["location"].as!string);
+    }
+
+    return list;
+  }
+
+  string[] getKeywords(size_t id) {
+    scope(exit) queryKeywords.reset;
+    queryKeywords.bind(":id", id);
+    string[] list;
+
+    foreach(result; queryKeywords.execute) {
+      list ~= result["keyword"].as!string;
+    }
+
+    return list;
+  }
+
+  Badge[] getBadges(size_t id) {
+    scope(exit) queryBadges.reset;
+    queryBadges.bind(":id", id);
+    Badge[] list;
+
+    foreach(result; queryBadges.execute) {
+      list ~= Badge(result["type"].as!uint.to!BadgeType, result["signature"].as!(ubyte[]));
+    }
+
+    return list;
+  }
+
+  PageData get(size_t id) {
+    scope(exit) queryPage.reset;
+
+    queryPage.bind(":id", id);
+    auto result = queryPage.execute.front;
+
+    auto page = PageData(
+      result["title"].as!string,
+      URI(result["location"].as!string),
+      result["description"].as!string,
+      SysTime.fromUnixTime(result["time"].as!ulong),
+      getRelations(id),
+      getBadges(id),
+      getKeywords(id),
+      result["type"].as!uint.to!InformationType
+    );
+
+    return page;
+  }
+
+  void close() {
+    queryPage.finalize;
+    queryRelations.finalize;
+    queryKeywords.finalize;
+    queryBadges.finalize;
+  }
+}
+
 class SQLiteStorage : Storage {
   private {
     Database db;
     KeywordStorage keywordStorage;
     BadgeStorage badgeStorage;
     LinkStorage linkStorage;
+    PageStorage pageStorage;
 
     Statement insertPage;
     Statement updatePage;
@@ -318,6 +409,7 @@ class SQLiteStorage : Storage {
     keywordStorage = new KeywordStorage(db);
     badgeStorage = new BadgeStorage(db);
     linkStorage = new LinkStorage(db);
+    pageStorage = new PageStorage(db);
 
     insertPage = db.prepare("INSERT INTO pages (title,  location,   description,  time,  type)
                                         VALUES (:title, :location, :description, :time, :type )");
@@ -469,7 +561,29 @@ class SQLiteStorage : Storage {
   }
 
   PageData[] query(string data) {
-    return [];
+    auto words = data.split(" ");
+
+    string wordPlaceholders = iota(0, words.length)
+      .map!(a => ":key" ~ a.to!string).join(", ");
+
+    string query = "SELECT DISTINCT pageId FROM keywords
+                      INNER JOIN keywordLinks ON keywordLinks.keywordId = keywords.id
+                      WHERE keyword IN ( " ~ wordPlaceholders ~ " )";
+
+    auto queryPages = db.prepare(query);
+    scope(exit) queryPages.finalize;
+
+    foreach(index, word; words) {
+      queryPages.bind(":key" ~ index.to!string, word);
+    }
+
+    PageData[] results;
+
+    foreach (Row row; queryPages.execute) {
+      results ~= pageStorage.get(row["pageId"].as!size_t);
+    }
+
+    return results;
   }
 
   bool exists(URI location) {
@@ -483,6 +597,7 @@ class SQLiteStorage : Storage {
     keywordStorage.close;
     badgeStorage.close;
     linkStorage.close;
+    pageStorage.close;
 
     insertPage.finalize;
     updatePage.finalize;
@@ -496,3 +611,5 @@ class SQLiteStorage : Storage {
     db.close;
   }
 }
+
+
