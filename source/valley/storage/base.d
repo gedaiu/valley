@@ -41,7 +41,7 @@ struct PageData {
 interface Storage {
   void add(PageData);
   void remove(URI);
-  PageData[] query(string);
+  PageData[] query(string, size_t start, size_t count);
 
   URI[] pending(const Duration, const size_t count, const string pending = "");
 }

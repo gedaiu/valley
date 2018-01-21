@@ -42,6 +42,8 @@ shared static this() {
 }
 
 void handleWebSocketConnection(scope WebSocket socket) {
+  writeln("new connection");
+
   auto connection = new WebsocketConnection(socket);
   auto clientService = new ClientService(storage, connection);
 

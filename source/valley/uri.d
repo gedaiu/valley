@@ -442,7 +442,7 @@ struct URI {
         }
     }
 
-    string toString() {
+    string toString() const {
       string result;
 
       if(scheme.length > 0) {
@@ -469,6 +469,10 @@ struct URI {
       }
 
       return result;
+    }
+
+    static URI fromString(string src) {
+      assert(false, "not implemented");
     }
 }
 

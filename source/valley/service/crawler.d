@@ -125,7 +125,7 @@ class CrawlerService {
       auto page = PageData(document.title, crawlPage.uri, document.preview,
           Clock.currTime, document.links.map!(a => URI(a)).array, [],
           document.plainText.clean.split(" ").map!(a => a.strip.toLower)
-          .map!(a => stem.get(a)).filter!(a => a.length > 4).array, InformationType.webPage);
+          .map!(a => stem.get(a)).array, InformationType.webPage);
 
       try {
         storage.add(page);

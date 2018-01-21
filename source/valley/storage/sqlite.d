@@ -560,7 +560,7 @@ class SQLiteStorage : Storage {
     return id;
   }
 
-  PageData[] query(string data) {
+  PageData[] query(string data, size_t start, size_t count) {
     auto words = data.split(" ");
 
     string wordPlaceholders = iota(0, words.length)
@@ -568,7 +568,7 @@ class SQLiteStorage : Storage {
 
     string query = "SELECT DISTINCT pageId FROM keywords
                       INNER JOIN keywordLinks ON keywordLinks.keywordId = keywords.id
-                      WHERE keyword IN ( " ~ wordPlaceholders ~ " )";
+                      WHERE keyword IN ( " ~ wordPlaceholders ~ " ) LIMIT " ~ start.to!string ~ ", " ~ count.to!string;
 
     auto queryPages = db.prepare(query);
     scope(exit) queryPages.finalize;

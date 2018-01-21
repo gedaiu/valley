@@ -10,12 +10,25 @@ import vibe.data.json;
 
 import valley.storage.base;
 import valley.uri;
+import valley.stemmer.english;
+import valley.stemmer.cleaner;
 
 struct Result {
   ulong id;
   string title;
   string description;
   URI location;
+}
+
+Json toJson(Result result) {
+  auto serialized = Json.emptyObject;
+
+  serialized["id"] = result.id;
+  serialized["title"] = result.title;
+  serialized["description"] = result.description;
+  serialized["location"] = result.location.toString;
+
+  return serialized;
 }
 
 interface Connection {
@@ -55,6 +68,7 @@ class ClientService {
     Connection connection;
 
     string queryString;
+    EnStemmer stem;
   }
 
   this(Storage storage, Connection connection) {
@@ -62,6 +76,7 @@ class ClientService {
     this.connection = connection;
 
     this.connection.onMessage(&this.onMessage);
+    this.stem = new EnStemmer;
   }
 
   void onMessage(const string message) {
@@ -82,13 +97,17 @@ class ClientService {
   }
 
   void setQuery(string queryString) {
-    this.queryString = queryString;
+    this.queryString = queryString.clean.split(" ").map!(a => stem.get(a)).array.join(" ");
+    import std.stdio;
+    writeln(this.queryString);
   }
 
   void getAll(string model) {
-    auto result = storage.query(queryString).enumerate.map!(a => Result(a[0],
-        a[1].title, a[1].description, a[1].location));
+    auto result = storage.query(queryString, 0, 50).enumerate
+      .map!(a => Result(a[0], a[1].title, a[1].description, a[1].location))
+      .map!(a => a.toJson)
+      .array;
 
-    connection.send(`{"searchResults":` ~ result.array.serializeToJsonString ~ `}`);
+    connection.send(`{"searchResults":` ~ result.serializeToJsonString ~ `}`);
   }
 }
