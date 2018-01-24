@@ -54,6 +54,10 @@ class HTMLDocument {
 
   auto plainText() {
     auto bodyNode = doc.querySelector("body");
+    if(bodyNode is null) {
+      return "";
+    }
+
     string[] pieces;
 
     string rawText = bodyNode.text.replace("\n", " ").split(" ").filter!(a => a != "").join(" ").to!string;
@@ -130,6 +134,15 @@ unittest {
   html.title.should.equal("");
   html.preview.should.equal("");
 
+  html.links.length.should.equal(0);
+}
+
+/// It should get the title and description from an empty string
+unittest {
+  auto html = new HTMLDocument(URI("http://dlang.org"), "");
+
+  html.title.should.equal("");
+  html.preview.should.equal("");
   html.links.length.should.equal(0);
 }
 
