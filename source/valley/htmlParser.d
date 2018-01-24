@@ -30,6 +30,10 @@ class HTMLDocument {
   string title() {
     auto node = doc.querySelector("title");
 
+    if(node is null) {
+      return "";
+    }
+
     return node.text.to!string;
   }
 
@@ -116,6 +120,17 @@ unittest {
   html.preview.should.equal("D is a general-purpose programming language with static typing, systems-level access, and C-like syntax.");
 
   html.links.length.should.be.greaterThan(0);
+}
+
+/// It should get the title and description from an empty page
+unittest {
+  auto rawHtml = readText("testData/page3.html");
+  auto html = new HTMLDocument(URI("http://dlang.org"), rawHtml);
+
+  html.title.should.equal("");
+  html.preview.should.equal("");
+
+  html.links.length.should.equal(0);
 }
 
 string toAbsoluteLink(const string link, const string base) pure {
