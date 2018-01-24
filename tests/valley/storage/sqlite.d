@@ -50,7 +50,7 @@ private alias suite = Spec!({
       });
 
       it("should query the page", {
-        auto result = storage.query("some description");
+        auto result = storage.query("some description", 0, 100);
 
         result.length.should.equal(1);
 
@@ -366,6 +366,135 @@ private alias suite = Spec!({
 
         it("should remove the links", {
           db.execute("SELECT count(*) FROM links").oneValue!long.should.equal(0);
+        });
+      });
+
+      describe("LazySQLitePageData", {
+        PageStorage storage;
+
+        beforeEach({
+          storage = new PageStorage(db);
+        });
+
+        afterEach({
+          storage.close;
+        });
+
+        it("should resolve the title", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.title.should.equal("some title");
+        });
+
+        it("should cache the title", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.title.should.equal("some title");
+          page.title.should.equal("some title");
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should resolve the description", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.description.should.equal("some description");
+        });
+
+        it("should cache the description", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.description.should.equal("some description");
+          page.description.should.equal("some description");
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should resolve the location", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.location.should.equal(URI("http://example.com"));
+        });
+
+        it("should cache the location", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.location.should.equal(URI("http://example.com"));
+          page.location.should.equal(URI("http://example.com"));
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should resolve the time", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.time.should.equal(time);
+        });
+
+        it("should cache the time", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.time.should.equal(time);
+          page.time.should.equal(time);
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should resolve the type", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.type.should.equal(InformationType.webImage);
+        });
+
+        it("should cache the type", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.type.should.equal(InformationType.webImage);
+          page.type.should.equal(InformationType.webImage);
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should resolve the keywords", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.keywords.should.equal([ "some", "keywords" ]);
+        });
+
+        it("should cache the keywords", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.keywords.should.equal([ "some", "keywords" ]);
+          page.keywords.should.equal([ "some", "keywords" ]);
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should resolve the badges", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.badges.should.equal([ Badge(BadgeType.approve, [1, 2, 3]) ]);
+        });
+
+        it("should cache the badges", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.badges.should.equal([ Badge(BadgeType.approve, [1, 2, 3]) ]);
+          page.badges.should.equal([ Badge(BadgeType.approve, [1, 2, 3]) ]);
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should resolve the relations", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
+        });
+
+        it("should cache the relations", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
+          page.relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should cache the relations", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
+          page.relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
+
+          storage.queryCount.should.equal(1);
+        });
+
+        it("should count the keywords", {
+          auto page = new LazySQLitePageData(1, storage);
+          page.countPresentKeywords([ "some", "keywords" ]).should.equal(2);
         });
       });
     });

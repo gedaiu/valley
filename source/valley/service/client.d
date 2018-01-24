@@ -4,6 +4,7 @@ import std.string;
 import std.algorithm;
 import std.array;
 import std.range;
+import std.conv;
 import vibe.http.websockets : WebSocket;
 
 import vibe.data.json;
@@ -18,6 +19,8 @@ struct Result {
   string title;
   string description;
   URI location;
+
+  double score;
 }
 
 Json toJson(Result result) {
@@ -67,7 +70,7 @@ class ClientService {
     Storage storage;
     Connection connection;
 
-    string queryString;
+    string[] query;
     EnStemmer stem;
   }
 
@@ -97,17 +100,26 @@ class ClientService {
   }
 
   void setQuery(string queryString) {
-    this.queryString = queryString.clean.split(" ").map!(a => stem.get(a)).array.join(" ");
+    this.query = queryString.clean.split(" ").map!(a => stem.get(a)).array;
     import std.stdio;
-    writeln(this.queryString);
+    writeln(this.query);
   }
 
   void getAll(string model) {
-    auto result = storage.query(queryString, 0, 50).enumerate
-      .map!(a => Result(a[0], a[1].title, a[1].description, a[1].location))
-      .map!(a => a.toJson)
+
+    Result[] result = storage.query(query.join(" "), 0, 500).enumerate
+      .map!(a => Result(a[0], a[1].title, a[1].description, a[1].location, score(a.value)))
       .array;
 
-    connection.send(`{"searchResults":` ~ result.serializeToJsonString ~ `}`);
+    auto indexList = new size_t[result.length];
+    result.makeIndex!"a.score > b.score"(indexList);
+
+    auto sortedResult = indexed(result, indexList).take(50).array;
+
+    connection.send(`{"searchResults":` ~ sortedResult.map!(a => a.toJson).array.serializeToJsonString ~ `}`);
+  }
+
+  double score(IPageData pageData) {
+    return 0;//query.length.to!double / pageData.countPresentKeywords(query).to!double;
   }
 }

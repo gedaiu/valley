@@ -122,10 +122,15 @@ class CrawlerService {
 
       auto stem = new EnStemmer;
 
-      auto page = PageData(document.title, crawlPage.uri, document.preview,
-          Clock.currTime, document.links.map!(a => URI(a)).array, [],
-          document.plainText.clean.split(" ").map!(a => a.strip.toLower)
-          .map!(a => stem.get(a)).array, InformationType.webPage);
+      auto page = PageData(
+        document.title,
+        crawlPage.uri,
+        document.preview,
+        Clock.currTime,
+        document.links.map!(a => URI(a)).uniq.array,
+        [],
+        document.plainText.clean.split(" ").map!(a => a.strip.toLower).map!(a => stem.get(a)).uniq.array,
+        InformationType.webPage);
 
       try {
         storage.add(page);
@@ -137,7 +142,7 @@ class CrawlerService {
 
     void fillQueue(immutable string authority) {
       writeln("Get more links for ", authority);
-      auto seed = storage.pending(1.days, 10, authority);
+      auto seed = storage.pending(5.days, 10, authority);
 
       foreach (uri; seed) {
         writeln("add ", uri.toString);

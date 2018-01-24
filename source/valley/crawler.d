@@ -11,6 +11,7 @@ import std.socket;
 import std.datetime;
 import std.algorithm;
 import std.utf;
+import std.string;
 import std.exception;
 
 /// A special uri queue used by the crawler to fetch new pages.
@@ -234,6 +235,11 @@ void request(const URI uri, void delegate(bool success, scope CrawlPage) callbac
       }
 
       string content;
+
+      if("Content-Type" !in res.headers || res.headers["Content-Type"].indexOf("text") == -1) {
+        callback(false, CrawlPage(uri, res.statusCode, headers));
+        return;
+      }
 
       try {
         content = res.bodyReader.readAllUTF8(true);

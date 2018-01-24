@@ -72,9 +72,26 @@ class HTMLDocument {
       }
     }
 
-    auto text = plainText.strip;
+    auto paragraphs = doc.querySelectorAll("p").map!(a => a.text.strip)
+      .filter!(a => a.count(" ") > 3)
+      .filter!(a => a.canFind(".") || a.canFind("!") || a.canFind("?"))
+      .filter!(a => a.length > 20);
 
-    size_t len = min(100, text.length);
+    string text;
+    string glue;
+
+    foreach(paragraph; paragraphs) {
+      text ~= glue ~ paragraph;
+      glue = " ";
+
+      if(text.length > 250) {
+        return text;
+      }
+    }
+
+    text = plainText.strip;
+
+    size_t len = min(250, text.length);
 
     return text[0..len];
   }

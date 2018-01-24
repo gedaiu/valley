@@ -46,6 +46,9 @@ void setupSqliteDb(string fileName) {
           destinationId   INTEGER NOT NULL
         )`);
 
+  db.run(`CREATE INDEX tag_keyword ON keywords (keyword)`);
+  db.run(`CREATE INDEX tag_destination_id ON links (destinationId)`);
+
   db.close;
 }
 
@@ -293,6 +296,105 @@ class LinkStorage {
   }
 }
 
+class LazySQLitePageData : IPageData {
+  private {
+    immutable size_t id;
+    PageStorage storage;
+    PageData page;
+
+    string _location;
+    bool resolvedTitle;
+    bool resolvedDescription;
+    bool resolvedLocation;
+    bool resolvedTime;
+    bool resolvedType;
+    bool resolvedKeywords;
+    bool resolvedBadges;
+    bool resolvedRelations;
+  }
+
+  this(size_t id, PageStorage storage) {
+    this.id = id;
+    this.storage = storage;
+  }
+
+  string title() {
+    if(!resolvedTitle) {
+      page.title = storage.get!"title"(id);
+      resolvedTitle = true;
+    }
+
+    return page.title;
+  }
+
+  URI location() {
+    if(!resolvedLocation) {
+      _location = storage.get!"location"(id);
+      resolvedLocation = true;
+    }
+
+    return URI(_location);
+  }
+
+  string description() {
+    if(!resolvedDescription) {
+      page.description = storage.get!"description"(id);
+      resolvedDescription = true;
+    }
+
+    return page.description;
+  }
+
+  SysTime time() {
+    if(!resolvedTime) {
+      page.time = SysTime.fromUnixTime(storage.get!"time"(id).to!ulong);
+      resolvedTime = true;
+    }
+
+    return page.time;
+  }
+
+  URI[] relations() {
+    if(!resolvedRelations) {
+      page.relations = storage.getRelations(id);
+      resolvedRelations = true;
+    }
+
+    return page.relations;
+  }
+
+  Badge[] badges() {
+    if(!resolvedBadges) {
+      page.badges = storage.getBadges(id);
+      resolvedBadges = true;
+    }
+
+    return page.badges;
+  }
+
+  string[] keywords() {
+    if(!resolvedKeywords) {
+      page.keywords = storage.getKeywords(id);
+      resolvedKeywords = true;
+    }
+
+    return page.keywords;
+  }
+
+  InformationType type() {
+    if(!resolvedType) {
+      page.type = storage.get!"type"(id).to!uint.to!InformationType;
+      resolvedType = true;
+    }
+
+    return page.type;
+  }
+
+  int countPresentKeywords(string[] keywords) {
+    return storage.countPresentKeywords(id, keywords);
+  }
+}
+
 class PageStorage {
   private {
     Statement queryPage;
@@ -302,8 +404,11 @@ class PageStorage {
     Database db;
   }
 
+  size_t queryCount;
+
   this(Database db) {
     queryPage = db.prepare("SELECT * FROM pages WHERE id = :id");
+
     queryRelations = db.prepare("SELECT pages.location FROM links
                                   INNER JOIN pages ON links.destinationId = pages.id
                                   WHERE pageId = :id");
@@ -317,7 +422,32 @@ class PageStorage {
     this.db = db;
   }
 
+  uint countPresentKeywords(size_t id, string[] keywords) {
+    string list = keywords.map!(a => `"` ~ a ~ `"`).join(",");
+    Statement statement = db.prepare("SELECT count(keywords.id) FROM keywordLinks
+                                  INNER JOIN keywords ON keywordLinks.keywordId = keywords.id
+                                  WHERE pageId = :id AND keywords.keyword IN (" ~ list ~ ")");
+    statement.bind(":id", id);
+    scope(exit) statement.finalize;
+
+    return statement.execute.oneValue!uint;
+  }
+
+  string get(string field)(size_t id) {
+    queryCount++;
+
+    enum query = "SELECT " ~ field ~ " FROM pages WHERE id = :id";
+    auto queryField = db.prepare(query);
+
+    queryField.bind(":id", id);
+    scope(exit) queryField.finalize;
+
+    return queryField.execute.oneValue!string;
+  }
+
   URI[] getRelations(size_t id) {
+    queryCount++;
+
     scope(exit) queryRelations.reset;
     queryRelations.bind(":id", id);
     URI[] list;
@@ -330,6 +460,8 @@ class PageStorage {
   }
 
   string[] getKeywords(size_t id) {
+    queryCount++;
+
     scope(exit) queryKeywords.reset;
     queryKeywords.bind(":id", id);
     string[] list;
@@ -342,6 +474,8 @@ class PageStorage {
   }
 
   Badge[] getBadges(size_t id) {
+    queryCount++;
+
     scope(exit) queryBadges.reset;
     queryBadges.bind(":id", id);
     Badge[] list;
@@ -353,24 +487,8 @@ class PageStorage {
     return list;
   }
 
-  PageData get(size_t id) {
-    scope(exit) queryPage.reset;
-
-    queryPage.bind(":id", id);
-    auto result = queryPage.execute.front;
-
-    auto page = PageData(
-      result["title"].as!string,
-      URI(result["location"].as!string),
-      result["description"].as!string,
-      SysTime.fromUnixTime(result["time"].as!ulong),
-      getRelations(id),
-      getBadges(id),
-      getKeywords(id),
-      result["type"].as!uint.to!InformationType
-    );
-
-    return page;
+  LazySQLitePageData get(size_t id) {
+    return new LazySQLitePageData(id, this);
   }
 
   void close() {
@@ -560,7 +678,7 @@ class SQLiteStorage : Storage {
     return id;
   }
 
-  PageData[] query(string data, size_t start, size_t count) {
+  IPageData[] query(string data, size_t start, size_t count) {
     auto words = data.split(" ");
 
     string wordPlaceholders = iota(0, words.length)
@@ -577,7 +695,7 @@ class SQLiteStorage : Storage {
       queryPages.bind(":key" ~ index.to!string, word);
     }
 
-    PageData[] results;
+    IPageData[] results;
 
     foreach (Row row; queryPages.execute) {
       results ~= pageStorage.get(row["pageId"].as!size_t);

@@ -36,9 +36,9 @@ class MockStorage : Storage {
   void add(PageData) {}
   void remove(URI) {}
 
-  PageData[] query(string queryString) {
+  IPageData[] query(string queryString, size_t, size_t) {
     _queryString = queryString;
-    return [ PageData("mock title", URI("http://location.com"), "some description") ];
+    return [ PageData("mock title", URI("http://location.com"), "some description").toClass ];
   }
 
   URI[] pending(const Duration, const size_t count, const string pending = "") {

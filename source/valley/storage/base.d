@@ -2,6 +2,8 @@ module valley.storage.base;
 
 import valley.uri;
 import std.datetime;
+import std.algorithm;
+import std.array;
 
 enum InformationType : uint {
   webPage = 0,
@@ -38,10 +40,75 @@ struct PageData {
   InformationType type;
 }
 
+IPageData toClass(PageData pageData) {
+  return new ResolvedPageData(pageData);
+}
+
+interface IPageData {
+  string title();
+  URI location();
+  string description();
+  SysTime time();
+
+  URI[] relations();
+  Badge[] badges();
+  string[] keywords();
+
+  InformationType type();
+
+  int countPresentKeywords(string[] keywords);
+}
+
+class ResolvedPageData : IPageData {
+  private {
+    PageData pageData;
+  }
+
+  this(PageData pageData) {
+    this.pageData = pageData;
+  }
+
+  string title() {
+    return pageData.title;
+  }
+
+  URI location() {
+    return pageData.location;
+  }
+
+  string description() {
+    return pageData.description;
+  }
+
+  SysTime time() {
+    return pageData.time;
+  }
+
+  URI[] relations() {
+    return pageData.relations;
+  }
+
+  Badge[] badges() {
+    return pageData.badges;
+  }
+
+  string[] keywords() {
+    return pageData.keywords;
+  }
+
+  InformationType type() {
+    return pageData.type;
+  }
+
+  int countPresentKeywords(string[] keywords) {
+    assert(false, "not implemented");
+  }
+}
+
 interface Storage {
   void add(PageData);
   void remove(URI);
-  PageData[] query(string, size_t start, size_t count);
+  IPageData[] query(string, size_t start, size_t count);
 
   URI[] pending(const Duration, const size_t count, const string pending = "");
 }

@@ -76,8 +76,7 @@ auto runApplication() {
 
 int main() {
   storage = new SQLiteStorage("data.db");
-
-  /*
+/*
   auto crawlerService = new CrawlerService(storage);
 
   crawlerService.add(URI("http://dlang.org/"));
