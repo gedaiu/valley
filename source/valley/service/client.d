@@ -30,6 +30,7 @@ Json toJson(Result result) {
   serialized["title"] = result.title;
   serialized["description"] = result.description;
   serialized["location"] = result.location.toString;
+  serialized["score"] = result.score;
 
   return serialized;
 }
@@ -88,26 +89,28 @@ class ClientService {
     auto param = message[pos + 1 .. $];
 
     switch (instruction) {
-    case "query":
-      setQuery(param);
-      break;
-    case "get all":
-      getAll(param);
-      break;
+      case "query":
+        setQuery(param);
+        break;
 
-    default:
+      case "get all":
+        getAll(param);
+        break;
+
+      default:
     }
   }
 
   void setQuery(string queryString) {
-    this.query = queryString.clean.split(" ").map!(a => stem.get(a)).array;
+    query = queryString.clean.split(" ").map!(a => stem.get(a)).array;
+
     import std.stdio;
-    writeln(this.query);
+    writeln(query);
   }
 
   void getAll(string model) {
 
-    Result[] result = storage.query(query.join(" "), 0, 500).enumerate
+    Result[] result = storage.query(query.join(" "), 0, 1000).enumerate
       .map!(a => Result(a[0], a[1].title, a[1].description, a[1].location, score(a.value)))
       .array;
 
@@ -120,6 +123,6 @@ class ClientService {
   }
 
   double score(IPageData pageData) {
-    return 0;//query.length.to!double / pageData.countPresentKeywords(query).to!double;
+    return pageData.countPresentKeywords(query).to!double / query.length.to!double;
   }
 }

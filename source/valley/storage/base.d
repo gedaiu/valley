@@ -101,7 +101,7 @@ class ResolvedPageData : IPageData {
   }
 
   int countPresentKeywords(string[] keywords) {
-    assert(false, "not implemented");
+    return 0;
   }
 }
 

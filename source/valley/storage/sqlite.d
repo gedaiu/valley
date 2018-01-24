@@ -47,7 +47,11 @@ void setupSqliteDb(string fileName) {
         )`);
 
   db.run(`CREATE INDEX tag_keyword ON keywords (keyword)`);
+  db.run(`CREATE INDEX tag_keyword_id ON keywords (id)`);
+  db.run(`CREATE INDEX tag_keywordLinks_pageId ON keywordLinks (pageId)`);
+  db.run(`CREATE INDEX tag_keywordLinks_linkId ON keywordLinks (keywordId)`);
   db.run(`CREATE INDEX tag_destination_id ON links (destinationId)`);
+  db.run(`CREATE INDEX tag_page_id ON pages (id)`);
 
   db.close;
 }
@@ -129,6 +133,10 @@ class KeywordStorage {
     selectPageLinks.reset;
 
     return list;
+  }
+
+  ulong[] getKeywordId(string[] keywords) {
+    return [];
   }
 
   void removeByPageId(ulong pageId) {
@@ -400,8 +408,10 @@ class PageStorage {
     Statement queryPage;
     Statement queryRelations;
     Statement queryKeywords;
+    Statement queryKeyword;
     Statement queryBadges;
     Database db;
+    ulong[string] keywords;
   }
 
   size_t queryCount;
@@ -417,17 +427,30 @@ class PageStorage {
                                   INNER JOIN keywords ON keywordLinks.keywordId = keywords.id
                                   WHERE pageId = :id");
 
+    queryKeyword = db.prepare("SELECT id FROM keywords WHERE keyword = :keyword");
     queryBadges = db.prepare("SELECT type, signature FROM badges WHERE pageId = :id");
 
     this.db = db;
   }
 
+  ulong toKeywordId(string keyword) {
+    if(keyword !in keywords) {
+      queryKeyword.bind(":keyword", keyword);
+      auto result = queryKeyword.execute;
+
+      keywords[keyword] = result.empty ? 0 : result.oneValue!ulong;
+      queryKeyword.reset;
+    }
+
+    return keywords[keyword];
+  }
+
   uint countPresentKeywords(size_t id, string[] keywords) {
-    string list = keywords.map!(a => `"` ~ a ~ `"`).join(",");
-    Statement statement = db.prepare("SELECT count(keywords.id) FROM keywordLinks
-                                  INNER JOIN keywords ON keywordLinks.keywordId = keywords.id
-                                  WHERE pageId = :id AND keywords.keyword IN (" ~ list ~ ")");
+    string list = keywords.map!(a => toKeywordId(a).to!string).join(",");
+    Statement statement = db.prepare("SELECT count(keywordId) FROM keywordLinks
+                                  WHERE pageId = :id AND keywordId IN (" ~ list ~ ")");
     statement.bind(":id", id);
+
     scope(exit) statement.finalize;
 
     return statement.execute.oneValue!uint;
@@ -495,6 +518,7 @@ class PageStorage {
     queryPage.finalize;
     queryRelations.finalize;
     queryKeywords.finalize;
+    queryKeyword.finalize;
     queryBadges.finalize;
   }
 }

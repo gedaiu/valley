@@ -103,7 +103,7 @@ unittest {
   auto html = new HTMLDocument(URI("https://twitter.com/c3daysleft?lang=en"), rawHtml);
 
   html.title.should.equal("Waiting for 34C3 (@c3daysleft) | Twitter");
-  html.preview.should.equal(html.plainText.strip[0..100]);
+  html.preview.should.equal("Are you sure you want to view these Tweets? Viewing Tweets won't unblock @c3daysleft Bugged by all those strange people out there? Chin up, #34C3 will start in only 0x3B days!! :) Bugged by all those strange people out there? Chin up, #34C3 will start in only 62 days!! :)");
   html.links.length.should.be.greaterThan(0);
 }
 

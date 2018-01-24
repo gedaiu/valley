@@ -44,6 +44,10 @@ class MockStorage : Storage {
   URI[] pending(const Duration, const size_t count, const string pending = "") {
     return [];
   }
+
+  ulong[] getKeywordId(string[] keywords) {
+    return [];
+  }
 }
 
 private alias suite = Spec!({
