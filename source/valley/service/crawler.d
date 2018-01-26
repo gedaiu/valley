@@ -23,9 +23,12 @@ class CrawlerService {
   this(Storage storage) {
     this.storage = storage;
     crawler = new Crawler("Valley (https://github.com/gedaiu/valley)",
-        5.seconds, CrawlerSettings(["dlang.org", "forum.dlang.org",
-          "code.dlang.org", "wiki.dlang.org", "blog.dlang.org",
-          "events.ccc.de", "stackoverflow.com"]));
+        5.seconds, CrawlerSettings([/*"dlang.org", "forum.dlang.org",
+          "code.dlang.org", "wiki.dlang.org", "blog.dlang.org",*/
+          "imdb.com",
+          "wired.com",
+          "ew.com",
+          /*"events.ccc.de", "stackoverflow.com", "w3schools.com", "fsfe.org"*/]));
 
     crawler.onRequest(&request);
     crawler.onResult(&crawlerResult);

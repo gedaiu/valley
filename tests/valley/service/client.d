@@ -60,8 +60,8 @@ private alias suite = Spec!({
       mockConnection.mockSend("query:some description");
       mockConnection.mockSend("get all:results");
 
-      mockStorage._queryString.should.equal("some description");
-      mockConnection.result.should.equal(`{"searchResults":[{"id":0,"title":"mock title","description":"some description"}]}` ~ "\n");
+      mockStorage._queryString.should.equal("some descript");
+      mockConnection.result.should.equal(`{"searchResults":[{"id":0,"description":"some description","title":"mock title","location":"http://location.com","score":0}]}` ~ "\n");
     });
   });
 });
