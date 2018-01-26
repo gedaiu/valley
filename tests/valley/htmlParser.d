@@ -22,6 +22,8 @@ private alias suite = Spec!({
       auto rawHtml = readText("testData/page2.html");
       auto html = new HTMLDocument(URI("http://dlang.org"), rawHtml);
 
+      html.isNoindex.should.equal(false);
+      html.isNofollow.should.equal(false);
       html.title.should.equal("Home - D Programming Language");
       html.preview.should.equal(
       "D is a general-purpose programming language with static typing, systems-level access, and C-like syntax.");
@@ -42,11 +44,22 @@ private alias suite = Spec!({
     it("should get the title and description from an empty string", {
       auto html = new HTMLDocument(URI("http://dlang.org"), "");
 
+      html.isNoindex.should.equal(false);
+      html.isNofollow.should.equal(false);
       html.title.should.equal("");
       html.preview.should.equal("");
       html.links.length.should.equal(0);
     });
 
+    it("should detect noindex and nofollow from html documents", {
+      auto rawHtml = readText("testData/noindex_nofollow.html");
+      auto html = new HTMLDocument(URI("http://dlang.org"), rawHtml);
+
+      html.isNoindex.should.equal(true);
+      html.isNofollow.should.equal(true);
+
+      html.links.length.should.equal(0);
+    });
   });
 
   describe("toAbsoluteLink", {

@@ -101,6 +101,24 @@ class HTMLDocument {
 
     return text[0..len];
   }
+
+  string[] robots() {
+    foreach(p; doc.querySelectorAll("meta")) {
+      if(p.hasAttr("name") && p.hasAttr("content") && p.attr("name").toLower == "robots") {
+        return p.attr("content").to!string.toLower.split(",").map!(a => a.strip).array;
+      }
+    }
+
+    return [];
+  }
+
+  bool isNoindex() {
+    return robots.canFind("noindex");
+  }
+
+  bool isNofollow() {
+    return robots.canFind("nofollow");
+  }
 }
 
 
