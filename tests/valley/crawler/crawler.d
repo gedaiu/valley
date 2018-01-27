@@ -42,8 +42,9 @@ private alias suite = Spec!({
       }
 
       crawler.onRequest(&requestHandler);
-
       crawler.add(URI("http://something.com"));
+      processEvents;
+      crawler.add(URI("http://something.com/page.html"));
       crawler.isFullWorking.should.equal(false);
     });
 
@@ -71,6 +72,7 @@ private alias suite = Spec!({
       crawler.onRequest(&requestHandler);
       crawler.onResult(&nullSinkResult);
       crawler.add(URI("http://something.com"));
+      processEvents;
       crawler.next();
       processEvents;
 
@@ -91,6 +93,7 @@ private alias suite = Spec!({
       crawler.onRequest(&requestHandler);
       crawler.onResult(&nullSinkResult);
       crawler.add(URI("http://something.com"));
+      processEvents;
       crawler.add(URI("http://something.com/page.html"));
       crawler.next();
       crawler.next();
@@ -124,6 +127,8 @@ private alias suite = Spec!({
       crawler.onRequest(&requestHandler);
       crawler.onResult(&pageResult);
       crawler.add(URI("http://something.com"));
+      processEvents;
+      crawler.next();
       crawler.next();
       crawler.next();
       crawler.next();
@@ -155,6 +160,7 @@ private alias suite = Spec!({
       crawler.onRequest(&requestHandler);
       crawler.onResult(&pageResult);
       crawler.add(URI("http://something.com"));
+      processEvents;
       crawler.next();
       crawler.next();
       crawler.next();
@@ -186,6 +192,8 @@ private alias suite = Spec!({
       crawler.onRequest(&requestHandler);
       crawler.onResult(&pageResult);
       crawler.add(URI("http://something.com"));
+      processEvents;
+
       crawler.next();
       crawler.next();
       crawler.next();
@@ -283,14 +291,16 @@ private alias suite = Spec!({
       crawler.add(URI("http://other.com"));
       crawler.add(URI("http://something.com"));
       crawler.add(URI("http://something.com/page.html"));
+      processEvents;
 
       auto begin = Clock.currTime;
       do {
         crawler.next();
+        processEvents;
       }
       while (index < 5);
 
-      fetchedUris.should.equal([
+      fetchedUris.should.containOnly([
         "http://other.com/robots.txt", "http://something.com/robots.txt",
         "http://something.com", "http://other.com", "http://something.com/page.html"]);
     });
@@ -338,9 +348,12 @@ private alias suite = Spec!({
 
       crawler.add(URI("http://white.com:8080"));
       crawler.add(URI("http://white.com:8080/page.html"));
+      processEvents;
+
       crawler.next();
       processEvents;
       emptyAuthority.should.equal("");
+      crawler.next();
       crawler.next();
       processEvents;
       emptyAuthority.should.equal("white.com:8080");

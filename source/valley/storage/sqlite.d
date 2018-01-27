@@ -12,6 +12,7 @@ import std.string;
 import std.range;
 import std.typecons : Nullable;
 
+import vibe.core.sync;
 import vibe.core.core;
 
 void setupSqliteDb(string fileName) {
@@ -65,7 +66,6 @@ class KeywordStorage {
     Statement removePageId;
     Statement selectPageLinks;
     Statement unlinkPage;
-    Statement lastInsertId;
     Statement selectKeyword;
 
     Database db;
@@ -78,16 +78,12 @@ class KeywordStorage {
     selectKeyword = db.prepare("SELECT id FROM keywords WHERE keyword = :keyword");
     selectPageLinks = db.prepare("SELECT keywordId FROM keywordLinks WHERE pageId = :pageId");
     unlinkPage = db.prepare("DELETE FROM keywordLinks WHERE pageId = :pageId AND keywordId = :keywordId");
-    lastInsertId = db.prepare("SELECT last_insert_rowid()");
 
     this.db = db;
   }
 
   ulong getLastId() {
-    ulong id = lastInsertId.execute.oneValue!ulong;
-    lastInsertId.reset;
-
-    return id;
+    return db.lastInsertRowid;
   }
 
   ulong add(string value) {
@@ -153,7 +149,6 @@ class KeywordStorage {
     insertKeywordLinks.finalize;
     unlinkPage.finalize;
     selectPageLinks.finalize;
-    lastInsertId.finalize;
     selectKeyword.finalize;
   }
 }
@@ -164,7 +159,6 @@ class BadgeStorage {
     Statement insertBadge;
     Statement removePageId;
     Statement removeBadge;
-    Statement lastInsertId;
     Statement selectPageBadges;
 
     Database db;
@@ -175,16 +169,12 @@ class BadgeStorage {
     removePageId = db.prepare("DELETE FROM badges WHERE pageId = :pageId");
     removeBadge = db.prepare("DELETE FROM badges WHERE pageId = :pageId AND type = :type");
     selectPageBadges = db.prepare("SELECT * FROM badges WHERE pageId = :pageId");
-    lastInsertId = db.prepare("SELECT last_insert_rowid()");
 
     this.db = db;
   }
 
   ulong getLastId() {
-    ulong id = lastInsertId.execute.oneValue!ulong;
-    lastInsertId.reset;
-
-    return id;
+    return db.lastInsertRowid;
   }
 
   Badge[] get(ulong pageId) {
@@ -229,7 +219,6 @@ class BadgeStorage {
     insertBadge.finalize;
     removePageId.finalize;
     removeBadge.finalize;
-    lastInsertId.finalize;
     selectPageBadges.finalize;
   }
 }
@@ -239,7 +228,6 @@ class LinkStorage {
     Statement insertLink;
     Statement removePageId;
     Statement removeLink;
-    Statement lastInsertId;
     Statement selectPageId;
     Database db;
   }
@@ -249,16 +237,12 @@ class LinkStorage {
     removePageId = db.prepare("DELETE FROM links WHERE pageId = :pageId");
     selectPageId = db.prepare("SELECT destinationId FROM links WHERE pageId = :pageId");
     removeLink = db.prepare("DELETE FROM links WHERE pageId = :pageId AND destinationId = :destinationId");
-    lastInsertId = db.prepare("SELECT last_insert_rowid()");
 
     this.db = db;
   }
 
   ulong getLastId() {
-    ulong id = lastInsertId.execute.oneValue!ulong;
-    lastInsertId.reset;
-
-    return id;
+    return db.lastInsertRowid;
   }
 
   ulong add(ulong pageId, ulong destinationId) {
@@ -300,7 +284,6 @@ class LinkStorage {
   void close() {
     insertLink.finalize;
     removePageId.finalize;
-    lastInsertId.finalize;
     removeLink.finalize;
     selectPageId.finalize;
   }
@@ -526,8 +509,11 @@ class PageStorage {
 }
 
 class SQLiteStorage : Storage {
+
   private {
+    __gshared TaskMutex mutex;
     Database db;
+
     KeywordStorage keywordStorage;
     BadgeStorage badgeStorage;
     LinkStorage linkStorage;
@@ -536,12 +522,17 @@ class SQLiteStorage : Storage {
     Statement insertPage;
     Statement updatePage;
     Statement deletePage;
-    Statement lastInsertId;
     Statement expiredPages;
     Statement pageCount;
 
     Statement selectPage;
     Statement pageId;
+
+    size_t addCount;
+  }
+
+  shared static this() {
+    mutex = new TaskMutex;
   }
 
   this(string fileName) {
@@ -550,6 +541,7 @@ class SQLiteStorage : Storage {
     }
 
     db = Database(fileName);
+
     keywordStorage = new KeywordStorage(db);
     badgeStorage = new BadgeStorage(db);
     linkStorage = new LinkStorage(db);
@@ -568,14 +560,19 @@ class SQLiteStorage : Storage {
     pageId = db.prepare("SELECT id FROM pages WHERE location = :location");
     expiredPages = db.prepare("SELECT location FROM pages WHERE time < :time AND location LIKE :authority LIMIT :count");
 
-    lastInsertId = db.prepare("SELECT last_insert_rowid()");
+    db.setProgressHandler(50, &this.progressHandler);
+  }
+
+  int progressHandler() nothrow {
+    try {
+      yield;
+    } catch(Throwable t){}
+
+    return 0;
   }
 
   ulong getLastId() {
-    ulong id = lastInsertId.execute.oneValue!ulong;
-    lastInsertId.reset;
-
-    return id;
+    return db.lastInsertRowid;
   }
 
   void remove(URI location) {
@@ -595,7 +592,22 @@ class SQLiteStorage : Storage {
   }
 
   void add(PageData data) {
+    addCount++;
+
+    version(unittest) {} else {
+      import std.stdio;
+      writeln("addCount:", addCount);
+    }
+    mutex.lock;
+    db.begin;
     addPage(data);
+    db.commit;
+    mutex.unlock;
+    addCount--;
+
+    version(unittest) {} else {
+      writeln("addCount:", addCount);
+    }
   }
 
   ulong getPageId(URI location) {
@@ -745,7 +757,6 @@ class SQLiteStorage : Storage {
 
     insertPage.finalize;
     updatePage.finalize;
-    lastInsertId.finalize;
     selectPage.finalize;
     pageCount.finalize;
     pageId.finalize;
@@ -756,4 +767,6 @@ class SQLiteStorage : Storage {
   }
 }
 
+struct AsyncStatement {
 
+}

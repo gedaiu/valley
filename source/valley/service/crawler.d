@@ -58,13 +58,11 @@ class CrawlerService {
   private {
     void storeUnknownPage(scope CrawlPage crawlPage) {
       writeln("store unknown page");
-      auto page = PageData("", crawlPage.uri, "", Clock.currTime, [], [], [],
-          InformationType.other);
+      auto page = PageData("", crawlPage.uri, "", Clock.currTime, [], [], [], InformationType.other);
 
       try {
         storage.add(page);
-      }
-      catch (Exception e) {
+      } catch (Exception e) {
         writeln("cannot save page to db `", crawlPage.uri, "`: ", e.msg);
       }
     }
@@ -83,8 +81,7 @@ class CrawlerService {
 
       try {
         storage.add(page);
-      }
-      catch (Exception e) {
+      } catch (Exception e) {
         writeln("cannot save page to db `", crawlPage.uri, "`: ", e.msg);
       }
     }
@@ -107,51 +104,54 @@ class CrawlerService {
       writeln("GOT: ", success, " ", crawlPage.statusCode, " ", crawlPage.uri);
       writeln(crawlPage.headers);
 
-      1.writeln;
       if (crawlPage.statusCode >= 300 && crawlPage.statusCode < 400) {
-        2.writeln;
         storeRedirect(crawlPage);
         return;
       }
 
-      3.writeln;
       if (crawlPage.statusCode >= 400 && crawlPage.statusCode < 500) {
-        4.writeln;
         storeUserError(crawlPage);
         return;
       }
 
-      5.writeln;
       if (crawlPage.content == "" || !success || "Content-Type" !in crawlPage.headers || !crawlPage.headers["Content-Type"].startsWith("text/html")) {
         storeUnknownPage(crawlPage);
         return;
       }
 
-      6.writeln;
       auto document = new HTMLDocument(crawlPage.uri, crawlPage.content);
+      URI[] links;
 
-      7.writeln;
+      if(!document.isNofollow) {
+        links = document.links.map!(a => URI(a)).uniq.array;
+      }
+
+      if(document.isNoindex) {
+        foreach(uri; links) {
+          storage.add(PageData("", uri));
+        }
+
+        return;
+      }
+
       auto stem = new EnStemmer;
 
-      8.writeln;
       auto page = PageData(
         document.title,
         crawlPage.uri,
         document.preview,
         Clock.currTime,
-        document.links.map!(a => URI(a)).uniq.array,
+        links,
         [],
         document.plainText.clean.split(" ").map!(a => a.strip.toLower).map!(a => stem.get(a)).uniq.array,
         InformationType.webPage);
 
-      9.writeln;
       try {
         storage.add(page);
       } catch (Exception e) {
         writeln("cannot save page to db `", crawlPage.uri, "`: ", e.msg);
+        debug writeln(e);
       }
-
-      10.writeln;
     }
 
     void fillQueue(immutable string authority) {

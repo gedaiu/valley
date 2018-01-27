@@ -25,6 +25,7 @@ import vibe.http.router : URLRouter;
 import vibe.http.server;
 
 import valley.uri;
+import valley.storage.base;
 import valley.storage.sqlite;
 import valley.service.crawler;
 import valley.service.client;

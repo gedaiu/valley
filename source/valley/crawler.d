@@ -167,20 +167,21 @@ class Crawler {
   ///
   void add(URI uri) {
     enforce(request !is null, "the request handler is not set.");
-    if (!settings.authorityWhitelist.canFind(uri.authority.toString)) {
+
+    string strAuthority = uri.authority.toString;
+
+    if (!settings.authorityWhitelist.canFind(strAuthority)) {
       return;
     }
 
-    if (uri.authority.toString in queues) {
+    if (strAuthority in queues) {
       queues[uri.authority.toString].add(uri);
       return;
     }
 
-    pending[uri.authority.toString] ~= uri;
+    pending[strAuthority] ~= uri;
 
     void robotsHandler(bool success, scope CrawlPage page) {
-      string strAuthority = uri.authority.toString;
-
       if(success) {
         queues[strAuthority] = new UriQueue(Robots(page.content).get(agentName),
             uri.authority, defaultDelay);
@@ -191,10 +192,15 @@ class Crawler {
       foreach (uri; pending[strAuthority]) {
         queues[strAuthority].add(uri);
       }
+      pending.remove(strAuthority);
+
+      queues[strAuthority].busy = false;
     }
 
-    if (pending[uri.authority.toString].length == 1) {
-      this.request(uri ~ "/robots.txt".path, &robotsHandler);
+    if (pending[strAuthority].length == 1) {
+      taskList ~= runTask({
+        this.request(uri ~ "/robots.txt".path, &robotsHandler);
+      });
     }
   }
 
@@ -207,7 +213,7 @@ class Crawler {
   }
 
   bool isFullWorking() {
-    return queues.byValue.filter!"!a.empty".empty;
+    return queues.byValue.filter!"!a.empty".empty || pending.keys.length > 0;
   }
 
   void next() {

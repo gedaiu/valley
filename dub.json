@@ -37,6 +37,6 @@
 	"copyright": "Copyright © 2017, Szabo Bogdan",
 	"license": "MIT",
 	"versions": [
-		"VibeCustomMain"
+		"VibeCustomMain", "SqliteEnableUnlockNotify"
 	]
 }
