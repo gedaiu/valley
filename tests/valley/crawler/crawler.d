@@ -381,6 +381,33 @@ private alias suite = Spec!({
       processEvents;
       emptyAuthority.should.containOnly(["white.com:8080", "other.com"]);
     });
+
+    it("should not add items to the queue if the request fails", {
+      auto crawler = new Crawler("", 1.seconds, CrawlerSettings(["something.com"]));
+      string[] fetchedUris;
+
+      int index;
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
+        fetchedUris ~= uri.toString;
+        callback(false, CrawlPage(uri));
+        index++;
+      }
+
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&nullSinkResult);
+      crawler.add(URI("http://something.com"));
+      crawler.add(URI("http://something.com/page.html"));
+
+      crawler.next();
+      processEvents;
+      crawler.next();
+      processEvents;
+      crawler.next();
+      processEvents;
+
+      index.should.equal(1);
+      fetchedUris.should.containOnly(["http://something.com/robots.txt"]);
+    });
   });
 
   describe("vibe request", {

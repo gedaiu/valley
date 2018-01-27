@@ -104,6 +104,10 @@ class CrawlerService {
       writeln("GOT: ", success, " ", crawlPage.statusCode, " ", crawlPage.uri);
       writeln(crawlPage.headers);
 
+      if(crawlPage.statusCode == 0) {
+        return;
+      }
+
       if (crawlPage.statusCode >= 300 && crawlPage.statusCode < 400) {
         storeRedirect(crawlPage);
         return;

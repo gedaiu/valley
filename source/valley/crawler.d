@@ -182,17 +182,21 @@ class Crawler {
     pending[strAuthority] ~= uri;
 
     void robotsHandler(bool success, scope CrawlPage page) {
-      if(success) {
-        queues[strAuthority] = new UriQueue(Robots(page.content).get(agentName),
-            uri.authority, defaultDelay);
-      } else {
+      scope(exit) {
+        pending.remove(strAuthority);
+      }
+
+      if(success && page.statusCode == 200) {
+        queues[strAuthority] = new UriQueue(Robots(page.content).get(agentName), uri.authority, defaultDelay);
+      } else if(page.statusCode > 0) {
         queues[strAuthority] = new UriQueue(uri.authority, defaultDelay);
+      } else {
+        return;
       }
 
       foreach (uri; pending[strAuthority]) {
         queues[strAuthority].add(uri);
       }
-      pending.remove(strAuthority);
 
       queues[strAuthority].busy = false;
     }
