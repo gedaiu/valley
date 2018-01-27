@@ -36,7 +36,7 @@ private alias suite = Spec!({
 
           [ URI("http://example.com/page1"), URI("http://example.com/page2") ],
           badges,
-          [ "some", "keywords" ],
+          [ Keyword("some", 1), Keyword("keywords", 1), Keyword("the", 2) ],
           InformationType.webImage
         );
 
@@ -60,7 +60,7 @@ private alias suite = Spec!({
         result[0].time.should.be.equal(time);
         result[0].type.should.equal(InformationType.webImage);
         result[0].relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
-        result[0].keywords.should.equal([ "some", "keywords" ]);
+        result[0].keywords.should.equal([ Keyword("some", 1), Keyword("keywords", 1), Keyword("the", 2) ]);
         result[0].badges.should.equal([ Badge(BadgeType.approve, [1, 2, 3]) ]);
       });
 
@@ -112,11 +112,11 @@ private alias suite = Spec!({
 
         string[] keywords;
         foreach (Row row; statement.execute) {
-          keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string;
+          keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string~ "." ~ row["count"].as!string;
         }
 
         statement.finalize;
-        keywords.should.containOnly([ "1.some", "2.keywords" ]);
+        keywords.should.containOnly([ "1.some.1", "2.keywords.1", "3.keywords.2" ]);
       });
 
       it("should add the keywordLinks", {
@@ -124,11 +124,11 @@ private alias suite = Spec!({
 
         string[] keywordLinks;
         foreach (Row row; statement.execute) {
-          keywordLinks ~= row["pageId"].as!string ~ "." ~ row["keywordId"].as!string;
+          keywordLinks ~= row["pageId"].as!string ~ "." ~ row["keywordId"].as!string~ "." ~ row["count"].as!string;
         }
 
         statement.finalize;
-        keywordLinks.should.containOnly([ "1.1", "1.2" ]);
+        keywordLinks.should.containOnly([ "1.1.1", "1.2.1", "1.3.2" ]);
       });
 
       it("should add the badges", {
@@ -164,7 +164,7 @@ private alias suite = Spec!({
             Clock.currTime,
             [],
             [],
-            [ "some", "keywords" ],
+            [ Keyword("some", 1), Keyword("keywords", 2) ],
             InformationType.webImage
           );
 
@@ -176,11 +176,11 @@ private alias suite = Spec!({
 
           string[] keywords;
           foreach (Row row; statement.execute) {
-            keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string;
+            keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string ~ "." ~ row["count"].as!string;
           }
 
           statement.finalize;
-          keywords.should.containOnly([ "1.some", "2.keywords" ]);
+          keywords.should.containOnly([ "1.some.1", "2.keywords.1", "3.the.2" ]);
         });
       });
 
@@ -195,7 +195,7 @@ private alias suite = Spec!({
 
             [ URI("http://example.com/page3"), URI("http://example.com/page4") ],
             badges,
-            [ "other", "keywords" ],
+            [ Keyword("other", 1), Keyword("keywords", 1) ],
             InformationType.webPage
           );
 
@@ -249,7 +249,7 @@ private alias suite = Spec!({
 
             [ URI("http://example.com/page4") ],
             badges,
-            [ "new" ],
+            [ Keyword("new", 1) ],
             InformationType.webPage
           );
 
@@ -353,7 +353,7 @@ private alias suite = Spec!({
           }
 
           statement.finalize;
-          keywords.should.containOnly([ "1.some", "2.keywords" ]);
+          keywords.should.containOnly([ "1.some", "2.keywords", "3.the" ]);
         });
 
         it("should remove the keywordLinks", {
@@ -447,13 +447,13 @@ private alias suite = Spec!({
 
         it("should resolve the keywords", {
           auto page = new LazySQLitePageData(1, storage);
-          page.keywords.should.equal([ "some", "keywords" ]);
+          page.keywords.should.equal([ Keyword("some", 1), Keyword("keywords", 1), Keyword("the", 2) ]);
         });
 
         it("should cache the keywords", {
           auto page = new LazySQLitePageData(1, storage);
-          page.keywords.should.equal([ "some", "keywords" ]);
-          page.keywords.should.equal([ "some", "keywords" ]);
+          page.keywords.should.equal([ Keyword("some", 1), Keyword("keywords", 1), Keyword("the", 2) ]);
+          page.keywords.should.equal([ Keyword("some", 1), Keyword("keywords", 1), Keyword("the", 2) ]);
 
           storage.queryCount.should.equal(1);
         });

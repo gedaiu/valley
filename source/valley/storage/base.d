@@ -27,6 +27,11 @@ struct Badge {
   ubyte[] signature;
 }
 
+struct Keyword {
+  string name;
+  ulong count;
+}
+
 struct PageData {
   string title;
   URI location;
@@ -35,7 +40,7 @@ struct PageData {
 
   URI[] relations;
   Badge[] badges;
-  string[] keywords;
+  Keyword[] keywords;
 
   InformationType type;
 }
@@ -52,7 +57,7 @@ interface IPageData {
 
   URI[] relations();
   Badge[] badges();
-  string[] keywords();
+  Keyword[] keywords();
 
   InformationType type();
 
@@ -92,7 +97,7 @@ class ResolvedPageData : IPageData {
     return pageData.badges;
   }
 
-  string[] keywords() {
+  Keyword[] keywords() {
     return pageData.keywords;
   }
 

@@ -147,7 +147,7 @@ class CrawlerService {
         Clock.currTime,
         links,
         [],
-        document.plainText.clean.split(" ").map!(a => a.strip.toLower).map!(a => stem.get(a)).uniq.array,
+        document.plainText.clean.split(" ").map!(a => a.strip.toLower).map!(a => Keyword(stem.get(a), 1)).uniq.array,
         InformationType.webPage);
 
       try {

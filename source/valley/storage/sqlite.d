@@ -18,12 +18,14 @@ import vibe.core.core;
 void setupSqliteDb(string fileName) {
   auto db = Database(fileName);
   db.run(`CREATE TABLE pages (
-          id           INTEGER PRIMARY KEY autoincrement,
-          title        TEXT,
-          location     TEXT NOT NULL,
-          description  TEXT,
-          time         INTEGER NOT NULL,
-          type         INTEGER NOT NULL
+          id               INTEGER PRIMARY KEY autoincrement,
+          title            TEXT,
+          location         TEXT NOT NULL,
+          description      TEXT,
+          descriptionMeta  TEXT,
+          pageHash         TEXT,
+          time             INTEGER NOT NULL,
+          type             INTEGER NOT NULL
         )`);
 
   db.run(`CREATE TABLE keywords (
@@ -33,7 +35,8 @@ void setupSqliteDb(string fileName) {
 
   db.run(`CREATE TABLE keywordLinks (
     pageId        INTEGER NOT NULL,
-    keywordId     INTEGER NOT NULL
+    keywordId     INTEGER NOT NULL,
+    count         INTEGER NOT NULL
   )`);
 
   db.run(`CREATE TABLE badges (
@@ -72,7 +75,7 @@ class KeywordStorage {
   }
 
   this(Database db) {
-    insertKeywordLinks = db.prepare("INSERT INTO keywordLinks (keywordId, pageId) VALUES (:keywordId, :pageId) ");
+    insertKeywordLinks = db.prepare("INSERT INTO keywordLinks (keywordId, pageId, count) VALUES (:keywordId, :pageId, :count) ");
     insertKeyword = db.prepare("INSERT INTO keywords (keyword) VALUES (:keyword) ");
     removePageId = db.prepare("DELETE FROM keywordLinks WHERE pageId = :pageId");
     selectKeyword = db.prepare("SELECT id FROM keywords WHERE keyword = :keyword");
@@ -86,8 +89,8 @@ class KeywordStorage {
     return db.lastInsertRowid;
   }
 
-  ulong add(string value) {
-    selectKeyword.bind(":keyword", value);
+  ulong add(Keyword value) {
+    selectKeyword.bind(":keyword", value.name);
     auto result = selectKeyword.execute;
     scope(exit) selectKeyword.reset;
 
@@ -95,16 +98,17 @@ class KeywordStorage {
       return result.oneValue!ulong;
     }
 
-    insertKeyword.bind(":keyword", value);
+    insertKeyword.bind(":keyword", value.name);
     insertKeyword.execute;
     insertKeyword.reset;
 
     return getLastId;
   }
 
-  ulong link(ulong pageId, ulong keywordId) {
+  ulong link(ulong pageId, ulong keywordId, ulong count) {
     insertKeywordLinks.bind(":keywordId", keywordId);
     insertKeywordLinks.bind(":pageId", pageId);
+    insertKeywordLinks.bind(":count", count);
 
     insertKeywordLinks.execute;
     insertKeywordLinks.reset;
@@ -365,7 +369,7 @@ class LazySQLitePageData : IPageData {
     return page.badges;
   }
 
-  string[] keywords() {
+  Keyword[] keywords() {
     if(!resolvedKeywords) {
       page.keywords = storage.getKeywords(id);
       resolvedKeywords = true;
@@ -467,15 +471,15 @@ class PageStorage {
     return list;
   }
 
-  string[] getKeywords(size_t id) {
+  Keyword[] getKeywords(size_t id) {
     queryCount++;
 
     scope(exit) queryKeywords.reset;
     queryKeywords.bind(":id", id);
-    string[] list;
+    Keyword[] list;
 
     foreach(result; queryKeywords.execute) {
-      list ~= result["keyword"].as!string;
+      list ~= Keyword(result["keyword"].as!string);
     }
 
     return list;
@@ -684,7 +688,7 @@ class SQLiteStorage : Storage {
     }
 
     foreach(keywordId; keywords) {
-      keywordStorage.link(id, keywordId);
+      keywordStorage.link(id, keywordId, 1);
     }
 
     auto existingBadges = badgeStorage.get(id).map!"a.type";

@@ -8,7 +8,7 @@
 		"ddmp": "0.0.1-0.dev.3",
 		"diet-ng": "1.4.4",
 		"eventcore": "0.8.27",
-		"fluent-asserts": "0.8.5",
+		"fluent-asserts": "0.9.0",
 		"htmld": "0.2.19",
 		"libasync": "0.8.3",
 		"libdominator": "1.1.5",
@@ -17,7 +17,7 @@
 		"memutils": "0.4.9",
 		"openssl": "1.1.6+1.0.1g",
 		"taggedalgebraic": "0.10.9",
-		"trial": "0.6.0",
+		"trial": "0.6.1",
 		"vibe-core": "1.3.0",
 		"vibe-d": "0.8.2"
 	}
