@@ -82,14 +82,14 @@ int main() {
   crawlerService.add(URI("http://ew.com/"));
   crawlerService.add(URI("https://www.wired.com/"));
   crawlerService.add(URI("http://www.imdb.com/"));
-  /*crawlerService.add(URI("https://www.w3schools.com/"));
+  crawlerService.add(URI("https://www.w3schools.com/"));
   crawlerService.add(URI("https://fsfe.org/"));
-  /*crawlerService.add(URI("http://dlang.org/"));
+  crawlerService.add(URI("http://dlang.org/"));
   crawlerService.add(URI("https://code.dlang.org/"));
   crawlerService.add(URI("https://forum.dlang.org/group/learn"));
   crawlerService.add(URI("https://forum.dlang.org/group/announce"));
   crawlerService.add(URI("https://stackoverflow.com/questions/tagged/d"));
-  crawlerService.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));*/
+  crawlerService.add(URI("https://events.ccc.de/congress/2017/wiki/index.php/Main_Page"));
 
   crawlerService.start;
 

@@ -14,6 +14,8 @@ import std.file;
 import std.string;
 import std.conv;
 
+import vibe.core.core;
+
 import trial.step;
 
 void nullSinkResult(bool, scope CrawlPage) {
@@ -26,6 +28,24 @@ void failureRequest(const URI uri, void delegate(bool success, scope CrawlPage) 
 private alias suite = Spec!({
 
   describe("the crawler", {
+
+    it("should full working when there is no queue", {
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
+      crawler.isFullWorking.should.equal(true);
+    });
+
+    it("should not full working when there is an uri in a queue", {
+      auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
+        string[string] headers;
+        callback(true, CrawlPage(uri, 200, headers, ""));
+      }
+
+      crawler.onRequest(&requestHandler);
+
+      crawler.add(URI("http://something.com"));
+      crawler.isFullWorking.should.equal(false);
+    });
 
     it("should GET the robots.txt on the first request", {
       auto crawler = new Crawler("", 0.seconds, CrawlerSettings(["something.com"]));
@@ -52,6 +72,7 @@ private alias suite = Spec!({
       crawler.onResult(&nullSinkResult);
       crawler.add(URI("http://something.com"));
       crawler.next();
+      processEvents;
 
       index.should.equal(2);
     });
@@ -73,6 +94,9 @@ private alias suite = Spec!({
       crawler.add(URI("http://something.com/page.html"));
       crawler.next();
       crawler.next();
+      crawler.next();
+      processEvents;
+      crawler.finish;
 
       fetchedUris.should.contain(["http://something.com", "http://something.com/page.html"]);
     });
@@ -102,6 +126,8 @@ private alias suite = Spec!({
       crawler.add(URI("http://something.com"));
       crawler.next();
       crawler.next();
+      crawler.next();
+      processEvents;
 
       fetchedUris.should.contain(["https://other.com/"]);
     });
@@ -131,6 +157,8 @@ private alias suite = Spec!({
       crawler.add(URI("http://something.com"));
       crawler.next();
       crawler.next();
+      crawler.next();
+      processEvents;
 
       fetchedUris.should.contain(["http://something.com/index.html"]);
     });
@@ -160,6 +188,8 @@ private alias suite = Spec!({
       crawler.add(URI("http://something.com"));
       crawler.next();
       crawler.next();
+      crawler.next();
+      processEvents;
 
       fetchedUris.should.contain(["http://something.com/"]);
     });
@@ -183,14 +213,17 @@ private alias suite = Spec!({
       crawler.onResult(&nullSinkResult);
 
       runTask({ crawler.add(URI("http://something.com")); });
-
       runTask({ crawler.add(URI("http://something.com/page.html")); });
-
       processEvents;
 
       crawler.next();
+      processEvents;
+
       crawler.next();
+      processEvents;
+
       crawler.next();
+      processEvents;
 
       fetchedUris.should.containOnly(["http://something.com/robots.txt",
       "http://something.com", "http://something.com/page.html"]);
@@ -232,6 +265,36 @@ private alias suite = Spec!({
       (Clock.currTime - begin).should.be.greaterThan(1.seconds);
     });
 
+    it("should GET the uris from the domain with the most links first", {
+      auto crawler = new Crawler("", 1.seconds, CrawlerSettings(["something.com", "other.com"]));
+      string[] fetchedUris;
+
+      int index;
+      void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
+        fetchedUris ~= uri.toString;
+
+        string[string] headers;
+        callback(true, CrawlPage(uri, 200, headers, ""));
+        index++;
+      }
+
+      crawler.onRequest(&requestHandler);
+      crawler.onResult(&nullSinkResult);
+      crawler.add(URI("http://other.com"));
+      crawler.add(URI("http://something.com"));
+      crawler.add(URI("http://something.com/page.html"));
+
+      auto begin = Clock.currTime;
+      do {
+        crawler.next();
+      }
+      while (index < 5);
+
+      fetchedUris.should.equal([
+        "http://other.com/robots.txt", "http://something.com/robots.txt",
+        "http://something.com", "http://other.com", "http://something.com/page.html"]);
+    });
+
     it("should GET pages only from the whitelisted domains", {
       string[] fetchedUris;
       void requestHandler(const URI uri, void delegate(bool, scope CrawlPage) @system callback) {
@@ -248,8 +311,11 @@ private alias suite = Spec!({
       crawler.add(URI("http://black.com"));
       crawler.add(URI("http://white.com"));
       crawler.next();
+      processEvents;
       crawler.next();
+      processEvents;
       crawler.next();
+      processEvents;
 
       fetchedUris.should.containOnly(["http://white.com/robots.txt", "http://white.com"]);
     });
@@ -273,8 +339,10 @@ private alias suite = Spec!({
       crawler.add(URI("http://white.com:8080"));
       crawler.add(URI("http://white.com:8080/page.html"));
       crawler.next();
+      processEvents;
       emptyAuthority.should.equal("");
       crawler.next();
+      processEvents;
       emptyAuthority.should.equal("white.com:8080");
     });
 
@@ -296,6 +364,8 @@ private alias suite = Spec!({
 
       crawler.add(URI("http://white.com:8080"));
       crawler.next();
+      crawler.next();
+      processEvents;
       emptyAuthority.should.containOnly(["white.com:8080", "other.com"]);
     });
   });

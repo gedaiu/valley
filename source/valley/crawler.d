@@ -5,6 +5,7 @@ import valley.robots;
 
 import vibe.http.client;
 import vibe.stream.operations;
+import vibe.core.core;
 
 import std.functional;
 import std.socket;
@@ -13,6 +14,7 @@ import std.algorithm;
 import std.utf;
 import std.string;
 import std.exception;
+import std.array;
 
 /// A special uri queue used by the crawler to fetch new pages.
 /// It will fetch an uri once, so if you want to fetch same page multiple
@@ -46,6 +48,11 @@ class UriQueue {
     lastFetch = Clock.currTime - 1.hours;
 
     this.delay = delay > agent.crawlDelay ? delay : agent.crawlDelay;
+  }
+
+  /// Get the number of elements from the queue
+  size_t size() {
+    return queue.length;
   }
 
   bool busy() const {
@@ -118,6 +125,7 @@ class Crawler {
 
     UriQueue[string] queues;
     URI[][string] pending;
+    Task[] taskList;
 
     immutable {
       string agentName;
@@ -134,8 +142,10 @@ class Crawler {
   }
 
   private void responseHandler(bool success, scope CrawlPage page) {
-    queues[page.uri.host].busy = false;
-    queues[page.uri.host].lastFetch = Clock.currTime;
+    string strAuthority = page.uri.authority.toString;
+
+    queues[strAuthority].busy = false;
+    queues[strAuthority].lastFetch = Clock.currTime;
 
     if (page.statusCode >= 300 && page.statusCode < 400) {
       if ("Location" in page.headers) {
@@ -156,53 +166,74 @@ class Crawler {
 
   ///
   void add(URI uri) {
+    enforce(request !is null, "the request handler is not set.");
     if (!settings.authorityWhitelist.canFind(uri.authority.toString)) {
       return;
     }
 
-    if (uri.host in queues) {
-      queues[uri.host].add(uri);
+    if (uri.authority.toString in queues) {
+      queues[uri.authority.toString].add(uri);
       return;
     }
 
-    pending[uri.host] ~= uri;
+    pending[uri.authority.toString] ~= uri;
 
     void robotsHandler(bool success, scope CrawlPage page) {
+      string strAuthority = uri.authority.toString;
+
       if(success) {
-        queues[uri.host] = new UriQueue(Robots(page.content).get(agentName),
+        queues[strAuthority] = new UriQueue(Robots(page.content).get(agentName),
             uri.authority, defaultDelay);
       } else {
-        queues[uri.host] = new UriQueue(uri.authority, defaultDelay);
+        queues[strAuthority] = new UriQueue(uri.authority, defaultDelay);
       }
 
-      foreach (uri; pending[uri.host]) {
-        queues[uri.host].add(uri);
+      foreach (uri; pending[strAuthority]) {
+        queues[strAuthority].add(uri);
       }
     }
 
-    if (pending[uri.host].length == 1) {
+    if (pending[uri.authority.toString].length == 1) {
       this.request(uri ~ "/robots.txt".path, &robotsHandler);
     }
   }
 
+  void finish() {
+    taskList = taskList.filter!(a => a.running).array;
+
+    foreach(task; taskList) {
+      task.join;
+    }
+  }
+
+  bool isFullWorking() {
+    return queues.byValue.filter!"!a.empty".empty;
+  }
+
   void next() {
-    auto freeQueues = queues.byValue.filter!"!a.empty".filter!(a => !a.busy);
+    auto freeQueues = queues.byValue.filter!"!a.empty".filter!(a => !a.busy).array;
+    taskList = taskList.filter!(a => a.running).array;
 
-    if (freeQueues.empty) {
+    if (freeQueues.length == 0) {
+      foreach(task; taskList) {
+        task.join;
+      }
+
       return;
     }
 
-    freeQueues.front.busy = true;
-    auto uri = freeQueues.front.pop;
-    this.request(uri, &responseHandler);
+    auto selectedQueue = freeQueues.maxElement!"a.size";
+    selectedQueue.busy = true;
+    auto uri = selectedQueue.pop;
 
-    if(queues.byValue.filter!"!a.empty".empty && emptyQueue !is null) {
-      settings.authorityWhitelist.each!(a => emptyQueue(a));
-      return;
-    }
+    taskList ~= runTask({
+      this.request(uri, &responseHandler);
+    });
 
-    if(freeQueues.front.empty && emptyQueue !is null) {
-      emptyQueue(uri.authority.toString);
+    if(queues.byValue.all!"a.empty" && emptyQueue !is null) {
+      foreach(host; settings.authorityWhitelist) {
+        emptyQueue(host);
+      }
     }
   }
 

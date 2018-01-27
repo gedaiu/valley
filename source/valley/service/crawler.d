@@ -23,12 +23,12 @@ class CrawlerService {
   this(Storage storage) {
     this.storage = storage;
     crawler = new Crawler("Valley (https://github.com/gedaiu/valley)",
-        5.seconds, CrawlerSettings([/*"dlang.org", "forum.dlang.org",
-          "code.dlang.org", "wiki.dlang.org", "blog.dlang.org",*/
+        5.seconds, CrawlerSettings(["dlang.org", "forum.dlang.org",
+          "code.dlang.org", "wiki.dlang.org", "blog.dlang.org",
           "imdb.com",
           "wired.com",
           "ew.com",
-          /*"events.ccc.de", "stackoverflow.com", "w3schools.com", "fsfe.org"*/]));
+          "events.ccc.de", "stackoverflow.com", "w3schools.com", "fsfe.org"]));
 
     crawler.onRequest(&request);
     crawler.onResult(&crawlerResult);
@@ -40,11 +40,13 @@ class CrawlerService {
       while (true) {
         try {
           crawler.next();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
           e.writeln;
         }
-        sleep(1.seconds);
+
+        if(crawler.isFullWorking) {
+          sleep(1.seconds);
+        }
       }
     });
   }
@@ -105,26 +107,33 @@ class CrawlerService {
       writeln("GOT: ", success, " ", crawlPage.statusCode, " ", crawlPage.uri);
       writeln(crawlPage.headers);
 
+      1.writeln;
       if (crawlPage.statusCode >= 300 && crawlPage.statusCode < 400) {
+        2.writeln;
         storeRedirect(crawlPage);
         return;
       }
 
+      3.writeln;
       if (crawlPage.statusCode >= 400 && crawlPage.statusCode < 500) {
+        4.writeln;
         storeUserError(crawlPage);
         return;
       }
 
-      if (crawlPage.content == "" || !success || "Content-Type" !in crawlPage.headers
-          || !crawlPage.headers["Content-Type"].startsWith("text/html")) {
+      5.writeln;
+      if (crawlPage.content == "" || !success || "Content-Type" !in crawlPage.headers || !crawlPage.headers["Content-Type"].startsWith("text/html")) {
         storeUnknownPage(crawlPage);
         return;
       }
 
+      6.writeln;
       auto document = new HTMLDocument(crawlPage.uri, crawlPage.content);
 
+      7.writeln;
       auto stem = new EnStemmer;
 
+      8.writeln;
       auto page = PageData(
         document.title,
         crawlPage.uri,
@@ -135,12 +144,14 @@ class CrawlerService {
         document.plainText.clean.split(" ").map!(a => a.strip.toLower).map!(a => stem.get(a)).uniq.array,
         InformationType.webPage);
 
+      9.writeln;
       try {
         storage.add(page);
-      }
-      catch (Exception e) {
+      } catch (Exception e) {
         writeln("cannot save page to db `", crawlPage.uri, "`: ", e.msg);
       }
+
+      10.writeln;
     }
 
     void fillQueue(immutable string authority) {

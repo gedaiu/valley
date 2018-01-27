@@ -12,6 +12,8 @@ import std.string;
 import std.range;
 import std.typecons : Nullable;
 
+import vibe.core.core;
+
 void setupSqliteDb(string fileName) {
   auto db = Database(fileName);
   db.run(`CREATE TABLE pages (
