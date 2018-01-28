@@ -32,6 +32,8 @@ private alias suite = Spec!({
           "some title",
           URI("http://example.com"),
           "some description",
+          "some meta description",
+          "hash",
           time,
 
           [ URI("http://example.com/page1"), URI("http://example.com/page2") ],
@@ -57,6 +59,8 @@ private alias suite = Spec!({
         result[0].title.should.equal("some title");
         result[0].location.should.equal(URI("http://example.com"));
         result[0].description.should.equal("some description");
+        result[0].descriptionMeta.should.equal("some meta description");
+        result[0].pageHash.should.equal("hash");
         result[0].time.should.be.equal(time);
         result[0].type.should.equal(InformationType.webImage);
         result[0].relations.should.equal([ URI("http://example.com/page1"), URI("http://example.com/page2") ]);
@@ -112,11 +116,11 @@ private alias suite = Spec!({
 
         string[] keywords;
         foreach (Row row; statement.execute) {
-          keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string~ "." ~ row["count"].as!string;
+          keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string;
         }
 
         statement.finalize;
-        keywords.should.containOnly([ "1.some.1", "2.keywords.1", "3.keywords.2" ]);
+        keywords.should.containOnly([ "1.some", "2.keywords", "3.the" ]);
       });
 
       it("should add the keywordLinks", {
@@ -161,6 +165,8 @@ private alias suite = Spec!({
             "some title",
             URI("http://example.com"),
             "some description",
+            "some meta description",
+            "hash",
             Clock.currTime,
             [],
             [],
@@ -176,11 +182,11 @@ private alias suite = Spec!({
 
           string[] keywords;
           foreach (Row row; statement.execute) {
-            keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string ~ "." ~ row["count"].as!string;
+            keywords ~= row["id"].as!string ~ "." ~ row["keyword"].as!string;
           }
 
           statement.finalize;
-          keywords.should.containOnly([ "1.some.1", "2.keywords.1", "3.the.2" ]);
+          keywords.should.containOnly([ "1.some", "2.keywords", "3.the" ]);
         });
       });
 
@@ -191,6 +197,8 @@ private alias suite = Spec!({
             "some other title",
             URI("http://example.com"),
             "some other description",
+            "some other meta description",
+            "other hash",
             Clock.currTime,
 
             [ URI("http://example.com/page3"), URI("http://example.com/page4") ],
@@ -211,6 +219,8 @@ private alias suite = Spec!({
             row["title"].as!string.should.equal("some other title");
             row["location"].as!string.should.equal("http://example.com");
             row["description"].as!string.should.equal("some other description");
+            row["descriptionMeta"].as!string.should.equal("some other meta description");
+            row["pageHash"].as!string.should.equal("other hash");
             row["time"].as!ulong.should.be.approximately(Clock.currTime.toUnixTime, 2000);
             row["type"].as!int.should.equal(0);
             found++;
@@ -245,11 +255,13 @@ private alias suite = Spec!({
             "some other title",
             URI("http://example.com"),
             "some other description",
+            "some other meta description",
+            "other hash",
             Clock.currTime,
 
             [ URI("http://example.com/page4") ],
             badges,
-            [ Keyword("new", 1) ],
+            [ Keyword("new", 1), Keyword("the", 300) ],
             InformationType.webPage
           );
 
@@ -281,7 +293,7 @@ private alias suite = Spec!({
           }
 
           statement.finalize;
-          keywords.should.containOnly([ "1.some", "2.keywords", "3.new"]);
+          keywords.should.containOnly([ "1.some", "2.keywords", "3.the", "4.new"]);
         });
 
         it("should update the keywordLinks", {
@@ -289,11 +301,11 @@ private alias suite = Spec!({
 
           string[] keywordLinks;
           foreach (Row row; statement.execute) {
-            keywordLinks ~= row["pageId"].as!string ~ "." ~ row["keywordId"].as!string;
+            keywordLinks ~= row["pageId"].as!string ~ "." ~ row["keywordId"].as!string~ "." ~ row["count"].as!string;
           }
 
           statement.finalize;
-          keywordLinks.should.containOnly([ "1.3" ]);
+          keywordLinks.should.containOnly([ "1.4.1", "1.3.300" ]);
         });
 
         it("should update the badge", {
@@ -514,6 +526,8 @@ private alias suite = Spec!({
           "some title",
           URI("http://example.com"),
           "some description",
+          "some meta description",
+          "hash",
           Clock.currTime,
 
           [ URI("http://other.com/page1"), URI("http://misc.com:8080/page2") ],
@@ -557,6 +571,8 @@ private alias suite = Spec!({
         auto data = PageData(
           "",
           URI("http://other.com"),
+          "",
+          "",
           "",
           Clock.currTime,
           [],

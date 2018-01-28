@@ -9,19 +9,31 @@ import std.string;
 import std.algorithm;
 import std.array;
 import std.math;
+import std.digest.sha;
 
 import html.dom;
+import valley.storage.base;
+import valley.stemmer.english;
+import valley.stemmer.cleaner;
 
 class HTMLDocument {
 
   private {
     Document doc;
+    immutable string _hash;
   }
 
   URI uri;
 
   this(URI uri, string document) {
     doc = createDocument(document);
+
+    if(document != "") {
+      _hash = toHexString(sha1Of(document)).to!string;
+    } else {
+      _hash = "";
+    }
+
     this.uri = uri;
   }
 
@@ -47,7 +59,7 @@ class HTMLDocument {
       }
     }
 
-    return list.filter!(a => a != "").array;
+    return list.filter!(a => a != "").array.sort.array;
   }
 
   auto plainText() {
@@ -68,16 +80,24 @@ class HTMLDocument {
       rawText = rawText.replace(p.text.replace("\n", " ").split(" ").filter!(a => a != "").join(" "), "");
     }
 
-    return rawText;
+    return rawText.replace("\n", " ").replace("\r", " ").replace("\t", " ").split(" ").filter!(a => a != "").join(" ");
   }
 
-  string preview() {
+  string meta() {
     foreach(p; doc.querySelectorAll("meta")) {
       if(p.hasAttr("name") && p.hasAttr("content") && p.attr("name").toLower == "description") {
         return p.attr("content").to!string.strip;
       }
     }
 
+    return "";
+  }
+
+  string hash() {
+    return _hash;
+  }
+
+  string preview() {
     auto paragraphs = doc.querySelectorAll("p").map!(a => a.text.strip)
       .filter!(a => a.count(" ") > 3)
       .filter!(a => a.canFind(".") || a.canFind("!") || a.canFind("?"))
@@ -91,15 +111,19 @@ class HTMLDocument {
       glue = " ";
 
       if(text.length > 250) {
-        return text;
+        break;
       }
     }
 
-    text = plainText.strip;
+    if(text.length == 0) {
+      text = plainText.strip;
+      size_t len = min(250, text.length);
+      text = text[0..len];
+    }
 
-    size_t len = min(250, text.length);
+    text = text.replace("\n", " ").replace("\r", " ").replace("\t", " ").split(" ").filter!(a => a != "").join(" ");
 
-    return text[0..len];
+    return text;
   }
 
   string[] robots() {
@@ -110,6 +134,20 @@ class HTMLDocument {
     }
 
     return [];
+  }
+
+  Keyword[] keywords() {
+    auto stem = new EnStemmer;
+    string[] keywords = plainText.clean.split(" ").map!(a => a.strip.toLower).map!(a => stem.get(a)).array.sort.array;
+    string[] uniqueKeywords = keywords.uniq.array;
+
+    Keyword[] finalKeywords;
+
+    foreach(keyword; uniqueKeywords) {
+      finalKeywords ~= Keyword(keyword, keywords.count!(a => a == keyword));
+    }
+
+    return finalKeywords;
   }
 
   bool isNoindex() {

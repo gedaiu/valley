@@ -66,20 +66,24 @@ class KeywordStorage {
   private {
     Statement insertKeyword;
     Statement insertKeywordLinks;
+    Statement updateKeywordLinks;
     Statement removePageId;
     Statement selectPageLinks;
     Statement unlinkPage;
     Statement selectKeyword;
+    Statement selectKeywordLink;
 
     Database db;
   }
 
   this(Database db) {
     insertKeywordLinks = db.prepare("INSERT INTO keywordLinks (keywordId, pageId, count) VALUES (:keywordId, :pageId, :count) ");
+    updateKeywordLinks = db.prepare("UPDATE keywordLinks SET count = :count WHERE keywordId = :keywordId AND pageId = :pageId");
     insertKeyword = db.prepare("INSERT INTO keywords (keyword) VALUES (:keyword) ");
     removePageId = db.prepare("DELETE FROM keywordLinks WHERE pageId = :pageId");
     selectKeyword = db.prepare("SELECT id FROM keywords WHERE keyword = :keyword");
-    selectPageLinks = db.prepare("SELECT keywordId FROM keywordLinks WHERE pageId = :pageId");
+    selectPageLinks = db.prepare("SELECT keywordId, count FROM keywordLinks WHERE pageId = :pageId");
+    selectKeywordLink = db.prepare("SELECT count FROM keywordLinks WHERE pageId = :pageId AND keywordId = :keywordId");
     unlinkPage = db.prepare("DELETE FROM keywordLinks WHERE pageId = :pageId AND keywordId = :keywordId");
 
     this.db = db;
@@ -89,31 +93,66 @@ class KeywordStorage {
     return db.lastInsertRowid;
   }
 
-  ulong add(Keyword value) {
-    selectKeyword.bind(":keyword", value.name);
-    auto result = selectKeyword.execute;
-    scope(exit) selectKeyword.reset;
+  auto getKeywordLink(ulong pageId, ulong keywordId) {
+    selectKeywordLink.bind(":pageId", pageId);
+    selectKeywordLink.bind(":keywordId", keywordId);
 
-    if(!result.empty) {
-      return result.oneValue!ulong;
+    scope(exit) selectKeywordLink.reset;
+    auto result = selectKeywordLink.execute;
+
+    struct KeywordLink {
+      ulong pageId;
+      ulong keywordId;
+      ulong count;
     }
 
-    insertKeyword.bind(":keyword", value.name);
-    insertKeyword.execute;
-    insertKeyword.reset;
+    if(result.empty) {
+      return KeywordLink(0, 0, 0);
+    }
 
-    return getLastId;
+    return KeywordLink(pageId, keywordId, result.oneValue!ulong);
   }
 
-  ulong link(ulong pageId, ulong keywordId, ulong count) {
-    insertKeywordLinks.bind(":keywordId", keywordId);
-    insertKeywordLinks.bind(":pageId", pageId);
-    insertKeywordLinks.bind(":count", count);
+  void add(ref Keyword value) {
+    selectKeyword.bind(":keyword", value.name);
+    scope(exit) selectKeyword.reset;
 
-    insertKeywordLinks.execute;
-    insertKeywordLinks.reset;
+    auto result = selectKeyword.execute;
+    ulong id;
 
-    return getLastId;
+    if(!result.empty) {
+      id = result.oneValue!ulong;
+    } else {
+      insertKeyword.bind(":keyword", value.name);
+      scope(exit) insertKeyword.reset;
+      insertKeyword.execute;
+
+      id = getLastId;
+    }
+
+    value.id = id;
+  }
+
+  void link(ulong pageId, Keyword keyword) {
+    auto existingKeywordLink = getKeywordLink(pageId, keyword.id);
+
+    if(existingKeywordLink.pageId == 0) {
+      insertKeywordLinks.bind(":keywordId", keyword.id);
+      insertKeywordLinks.bind(":count", keyword.count);
+      insertKeywordLinks.bind(":pageId", pageId);
+
+      insertKeywordLinks.execute;
+      insertKeywordLinks.reset;
+
+      return;
+    }
+
+    updateKeywordLinks.bind(":keywordId", keyword.id);
+    updateKeywordLinks.bind(":count", keyword.count);
+    updateKeywordLinks.bind(":pageId", pageId);
+
+    updateKeywordLinks.execute;
+    updateKeywordLinks.reset;
   }
 
   void unlink(ulong pageId, ulong keywordId) {
@@ -123,13 +162,13 @@ class KeywordStorage {
     unlinkPage.reset;
   }
 
-  ulong[] pageLinks(ulong pageId) {
-    ulong[] list;
+  Keyword[] pageLinks(ulong pageId) {
+    Keyword[] list;
 
     selectPageLinks.bind(":pageId", pageId);
 
     foreach (Row row; selectPageLinks.execute) {
-      list ~= row["keywordId"].as!ulong;
+      list ~= Keyword("", row["count"].as!ulong, row["keywordId"].as!ulong);
     }
 
     selectPageLinks.reset;
@@ -150,10 +189,12 @@ class KeywordStorage {
   void close() {
     removePageId.finalize;
     insertKeyword.finalize;
+    updateKeywordLinks.finalize;
     insertKeywordLinks.finalize;
     unlinkPage.finalize;
     selectPageLinks.finalize;
     selectKeyword.finalize;
+    selectKeywordLink.finalize;
   }
 }
 
@@ -302,6 +343,8 @@ class LazySQLitePageData : IPageData {
     string _location;
     bool resolvedTitle;
     bool resolvedDescription;
+    bool resolvedDescriptionMeta;
+    bool resolvedPageHash;
     bool resolvedLocation;
     bool resolvedTime;
     bool resolvedType;
@@ -340,6 +383,24 @@ class LazySQLitePageData : IPageData {
     }
 
     return page.description;
+  }
+
+  string descriptionMeta() {
+    if(!resolvedDescriptionMeta) {
+      page.descriptionMeta = storage.get!"descriptionMeta"(id);
+      resolvedDescriptionMeta = true;
+    }
+
+    return page.descriptionMeta;
+  }
+
+  string pageHash() {
+    if(!resolvedPageHash) {
+      page.pageHash = storage.get!"pageHash"(id);
+      resolvedPageHash = true;
+    }
+
+    return page.pageHash;
   }
 
   SysTime time() {
@@ -412,7 +473,7 @@ class PageStorage {
                                   INNER JOIN pages ON links.destinationId = pages.id
                                   WHERE pageId = :id");
 
-    queryKeywords = db.prepare("SELECT keywords.keyword FROM keywordLinks
+    queryKeywords = db.prepare("SELECT keywords.keyword, keywordLinks.count FROM keywordLinks
                                   INNER JOIN keywords ON keywordLinks.keywordId = keywords.id
                                   WHERE pageId = :id");
 
@@ -479,7 +540,7 @@ class PageStorage {
     Keyword[] list;
 
     foreach(result; queryKeywords.execute) {
-      list ~= Keyword(result["keyword"].as!string);
+      list ~= Keyword(result["keyword"].as!string, result["count"].as!ulong);
     }
 
     return list;
@@ -551,12 +612,13 @@ class SQLiteStorage : Storage {
     linkStorage = new LinkStorage(db);
     pageStorage = new PageStorage(db);
 
-    insertPage = db.prepare("INSERT INTO pages (title,  location,   description,  time,  type)
-                                        VALUES (:title, :location, :description, :time, :type )");
+    insertPage = db.prepare("INSERT INTO pages (title,  location,   description,  descriptionMeta,  pageHash,  time,  type)
+                                        VALUES (:title, :location, :description, :descriptionMeta, :pageHash, :time, :type )");
 
     deletePage = db.prepare("DELETE FROM pages WHERE id = :id");
 
     updatePage = db.prepare("UPDATE pages SET title=:title, location=:location, description=:description,
+                              descriptionMeta=:descriptionMeta, pageHash=:pageHash,
                               time=:time, type=:type WHERE id=:id");
 
     selectPage = db.prepare("SELECT * FROM pages WHERE location = :location");
@@ -598,20 +660,13 @@ class SQLiteStorage : Storage {
   void add(PageData data) {
     addCount++;
 
-    version(unittest) {} else {
-      import std.stdio;
-      writeln("addCount:", addCount);
-    }
     mutex.lock;
     db.begin;
     addPage(data);
     db.commit;
     mutex.unlock;
-    addCount--;
 
-    version(unittest) {} else {
-      writeln("addCount:", addCount);
-    }
+    addCount--;
   }
 
   ulong getPageId(URI location) {
@@ -651,6 +706,8 @@ class SQLiteStorage : Storage {
       insertPage.bind(":title", data.title);
       insertPage.bind(":location", data.location.toString);
       insertPage.bind(":description", data.description);
+      insertPage.bind(":descriptionMeta", data.descriptionMeta);
+      insertPage.bind(":pageHash", data.pageHash);
       insertPage.bind(":time", data.time.toUnixTime);
       insertPage.bind(":type", data.type.to!uint);
 
@@ -666,6 +723,8 @@ class SQLiteStorage : Storage {
       updatePage.bind(":title", data.title);
       updatePage.bind(":location", data.location.toString);
       updatePage.bind(":description", data.description);
+      updatePage.bind(":descriptionMeta", data.descriptionMeta);
+      updatePage.bind(":pageHash", data.pageHash);
       updatePage.bind(":time", data.time.toUnixTime);
       updatePage.bind(":type", data.type.to!uint);
 
@@ -674,21 +733,19 @@ class SQLiteStorage : Storage {
       updatePage.clearBindings;
     }
 
-    ulong[] keywords;
-
-    foreach(keyword; data.keywords) {
-      keywords ~= keywordStorage.add(keyword);
+    foreach(ref keyword; data.keywords) {
+      keywordStorage.add(keyword);
     }
 
-    auto pageLinks = keywordStorage.pageLinks(id);
-    foreach(linkedId; pageLinks) {
-      if(!keywords.canFind(linkedId)) {
-        keywordStorage.unlink(id, linkedId);
+    auto pageKeywords = keywordStorage.pageLinks(id);
+    foreach(pageKeyword; pageKeywords) {
+      if(!data.keywords.map!"a.id".canFind(pageKeyword.id)) {
+        keywordStorage.unlink(id, pageKeyword.id);
       }
     }
 
-    foreach(keywordId; keywords) {
-      keywordStorage.link(id, keywordId, 1);
+    foreach(keyword; data.keywords) {
+      keywordStorage.link(id, keyword);
     }
 
     auto existingBadges = badgeStorage.get(id).map!"a.type";
@@ -769,8 +826,4 @@ class SQLiteStorage : Storage {
 
     db.close;
   }
-}
-
-struct AsyncStatement {
-
 }

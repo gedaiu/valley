@@ -30,12 +30,17 @@ struct Badge {
 struct Keyword {
   string name;
   ulong count;
+  ulong id;
 }
 
 struct PageData {
   string title;
   URI location;
+
   string description;
+  string descriptionMeta;
+  string pageHash;
+
   SysTime time;
 
   URI[] relations;
@@ -53,6 +58,8 @@ interface IPageData {
   string title();
   URI location();
   string description();
+  string descriptionMeta();
+  string pageHash();
   SysTime time();
 
   URI[] relations();
@@ -83,6 +90,14 @@ class ResolvedPageData : IPageData {
 
   string description() {
     return pageData.description;
+  }
+
+  string descriptionMeta() {
+    return pageData.descriptionMeta;
+  }
+
+  string pageHash() {
+    return pageData.pageHash;
   }
 
   SysTime time() {

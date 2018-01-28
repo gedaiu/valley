@@ -58,7 +58,7 @@ class CrawlerService {
   private {
     void storeUnknownPage(scope CrawlPage crawlPage) {
       writeln("store unknown page");
-      auto page = PageData("", crawlPage.uri, "", Clock.currTime, [], [], [], InformationType.other);
+      auto page = PageData("", crawlPage.uri, "", "", "", Clock.currTime, [], [], [], InformationType.other);
 
       try {
         storage.add(page);
@@ -75,7 +75,7 @@ class CrawlerService {
       }
 
       auto page = PageData("Redirect to " ~ crawlPage.headers["Location"], crawlPage.uri,
-          crawlPage.statusCode.to!string, Clock.currTime,
+          crawlPage.statusCode.to!string, "", "", Clock.currTime,
 
           [URI(crawlPage.headers["Location"])], [], [], InformationType.redirect);
 
@@ -90,7 +90,7 @@ class CrawlerService {
       writeln("store user error");
 
       auto page = PageData(crawlPage.statusCode.to!string ~ " error",
-          crawlPage.uri, "", Clock.currTime, [], [], [], InformationType.userError);
+          crawlPage.uri, "", "", "", Clock.currTime, [], [], [], InformationType.userError);
 
       try {
         storage.add(page);
@@ -138,16 +138,16 @@ class CrawlerService {
         return;
       }
 
-      auto stem = new EnStemmer;
-
       auto page = PageData(
         document.title,
         crawlPage.uri,
         document.preview,
+        document.meta,
+        document.hash,
         Clock.currTime,
         links,
         [],
-        document.plainText.clean.split(" ").map!(a => a.strip.toLower).map!(a => Keyword(stem.get(a), 1)).uniq.array,
+        document.keywords,
         InformationType.webPage);
 
       try {
