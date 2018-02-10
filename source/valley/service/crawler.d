@@ -46,6 +46,8 @@ class CrawlerService {
 
         if(crawler.isFullWorking) {
           sleep(1.seconds);
+        } else {
+          sleep(50.msecs);
         }
       }
     });
